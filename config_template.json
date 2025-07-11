@@ -1,0 +1,14 @@
+{
+  "inputPaths": ["lib"],
+  "outputDir": "mutations_output",
+  "mutationTypes": ["arithmetic", "logical", "relational"],
+  "enableTracking": true,
+  "useCumulative": true,
+  "verbose": false,
+  "parallel": false,
+  "maxThreads": 2,
+  "excludePatterns": ["**/*_test.dart", "**/test/**"],
+  "includePatterns": ["**/*.dart"],
+  "lineRanges": {},
+  "reportFormat": "html"
+}
