@@ -30,6 +30,27 @@ class SmartMutationConfig {
   final bool parallel;
   final int? maxThreads;
 
+  /// Create default configuration for quick start
+  factory SmartMutationConfig.defaultConfig() {
+    return const SmartMutationConfig(
+      inputPaths: ['lib/', 'bin/'],
+      outputDir: 'mutations',
+      mutationTypes: ['arithmetic', 'logical', 'relational'],
+      enableTracking: true,
+      useCumulative: false,
+      verbose: false,
+      excludePatterns: [
+        '**/generated/**',
+        '**/*.g.dart',
+        '**/test/**',
+      ],
+      includePatterns: ['**/*.dart'],
+      lineRanges: {},
+      parallel: true,
+      maxThreads: null,
+    );
+  }
+
   /// Create configuration from JSON
   factory SmartMutationConfig.fromJson(Map<String, dynamic> json) {
     return SmartMutationConfig(

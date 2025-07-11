@@ -5,14 +5,16 @@ import 'config_model.dart';
 /// Configuration class for CLI arguments
 class CliConfig {
   const CliConfig({
-    required this.configFile,
+    this.configFile,
     this.verbose = false,
     this.generateExample = false,
+    this.useDefault = false,
   });
 
-  final String configFile;
+  final String? configFile;
   final bool verbose;
   final bool generateExample;
+  final bool useDefault;
 }
 
 /// Parse and validate command line arguments
@@ -61,15 +63,41 @@ Future<CliConfig> parseArguments(List<String> arguments) async {
     }
   }
 
-  // Validate that config file is provided
+  // Use default configuration if no config file provided
+  if (configFile == null && results.rest.isEmpty) {
+    if (results['verbose'] as bool) {
+      print('No configuration file provided. Using default configuration.');
+      print('Target directories: lib/, bin/');
+      print('Mutation types: arithmetic, logical, relational');
+      print('Output directory: mutations/');
+      print('');
+      print('To use custom configuration:');
+      print('  - Generate example: dart run smart_mutation --generate-example');
+      print('  - Use custom config: dart run smart_mutation --config <file.json>');
+      print('');
+    }
+    
+    return CliConfig(
+      configFile: null,
+      verbose: results['verbose'] as bool,
+      useDefault: true,
+    );
+  }
+
+  // Error if config file is required but not provided
   if (configFile == null) {
-    print('Error: Configuration file is required.');
+    print('Error: Invalid argument provided.');
     print('');
-    print('Usage: dart run smart_mutation --config <config-file.json>');
-    print('       dart run smart_mutation <config-file.json>');
+    print('Usage: dart run smart_mutation [options] [config-file.json]');
     print('');
-    print('Generate example: dart run smart_mutation --generate-example');
-    print('For help: dart run smart_mutation --help');
+    print('Options:');
+    print('  --config <file.json>     Use specific configuration file');
+    print('  --generate-example       Generate example configuration');
+    print('  --verbose               Show verbose output');
+    print('  --help                  Show this help');
+    print('');
+    print('No arguments: Use default configuration (lib/, bin/ → mutations/)');
+    print('');
     exit(1);
   }
 
@@ -116,15 +144,17 @@ void printUsage(ArgParser parser) {
   print('Smart Mutation - Dart Mutation Testing Tool');
   print('');
   print('Usage:');
-  print('  dart run smart_mutation --config <config-file.json>');
+  print('  dart run smart_mutation [--config <config-file.json>]');
   print('  dart run smart_mutation <config-file.json>');
+  print('  dart run smart_mutation                              # Use default config');
   print('');
   print('Options:');
   print(parser.usage);
   print('');
   print('JSON Configuration:');
-  print('  All mutation settings are configured through a JSON file.');
+  print('  All mutation settings can be configured through a JSON file.');
   print('  Generate example: dart run smart_mutation --generate-example');
+  print('  No config file: Uses default settings (lib/, bin/ → mutations/)');
   print('');
   print('Configuration Options (in JSON file):');
   print('  inputPaths       - Array of files/directories to mutate');
@@ -140,6 +170,9 @@ void printUsage(ArgParser parser) {
   print('  maxThreads       - Number of threads for parallel processing');
   print('');
   print('Examples:');
+  print('  # Use default configuration (lib/, bin/ → mutations/)');
+  print('  dart run smart_mutation');
+  print('');
   print('  # Generate example configuration');
   print('  dart run smart_mutation --generate-example');
   print('');
@@ -147,6 +180,6 @@ void printUsage(ArgParser parser) {
   print('  dart run smart_mutation --config my_config.json');
   print('  dart run smart_mutation my_config.json');
   print('');
-  print('  # Verbose output');
-  print('  dart run smart_mutation --config my_config.json --verbose');
+  print('  # Verbose output with default config');
+  print('  dart run smart_mutation --verbose');
 }

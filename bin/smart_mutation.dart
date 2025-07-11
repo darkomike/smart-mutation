@@ -18,12 +18,47 @@ Future<void> main(List<String> arguments) async {
 Future<void> _runJsonMode(CliConfig cliConfig) async {
   print('🚀 Smart Mutation Tool - JSON Configuration Mode');
   
-  // Load JSON configuration
-  final jsonConfig = await SmartMutationConfig.fromFile(cliConfig.configFile);
+  SmartMutationConfig jsonConfig;
   
-  if (cliConfig.verbose) {
-    print('Loaded configuration from: ${cliConfig.configFile}');
-    print('Configuration: $jsonConfig');
+  if (cliConfig.useDefault) {
+    // Use default configuration
+    jsonConfig = SmartMutationConfig.defaultConfig();
+    
+    if (cliConfig.verbose) {
+      print('Using default configuration:');
+      print('  Input paths: ${jsonConfig.inputPaths.join(", ")}');
+      print('  Output directory: ${jsonConfig.outputDir}');
+      print('  Mutation types: ${jsonConfig.mutationTypes.join(", ")}');
+      print('  Tracking enabled: ${jsonConfig.enableTracking}');
+      print('  Cumulative mode: ${jsonConfig.useCumulative}');
+      print('  Parallel processing: ${jsonConfig.parallel}');
+      print('');
+    }
+  } else {
+    // Load JSON configuration from file
+    jsonConfig = await SmartMutationConfig.fromFile(cliConfig.configFile!);
+    
+    if (cliConfig.verbose) {
+      print('Loaded configuration from: ${cliConfig.configFile}');
+      print('Configuration: $jsonConfig');
+    }
+  }
+  
+  // Override verbose setting if specified via CLI
+  if (cliConfig.verbose && !jsonConfig.verbose) {
+    jsonConfig = SmartMutationConfig(
+      inputPaths: jsonConfig.inputPaths,
+      outputDir: jsonConfig.outputDir,
+      mutationTypes: jsonConfig.mutationTypes,
+      enableTracking: jsonConfig.enableTracking,
+      useCumulative: jsonConfig.useCumulative,
+      verbose: true, // Override to true
+      excludePatterns: jsonConfig.excludePatterns,
+      includePatterns: jsonConfig.includePatterns,
+      lineRanges: jsonConfig.lineRanges,
+      parallel: jsonConfig.parallel,
+      maxThreads: jsonConfig.maxThreads,
+    );
   }
   
   // Process with JSON configuration

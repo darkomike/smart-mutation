@@ -3,7 +3,7 @@
 [![Dart Version](https://img.shields.io/badge/Dart-3.0%2B-blue.svg)](https://dart.dev)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-An advanced, high-performance Dart mutation testing tool designed for comprehensive code quality analysis and test effectiveness evaluation.
+An advanced, high-performance Dart mutation testing tool designed for comprehensive code quality analysis and test effectiveness evaluation. Now featuring a streamlined JSON-only configuration system for maximum flexibility and reusability.
 
 ## 🚀 Key Features
 
@@ -11,7 +11,7 @@ An advanced, high-performance Dart mutation testing tool designed for comprehens
 - **Regex Pattern Caching**: 3x faster processing through intelligent pattern caching
 - **Async Processing**: Non-blocking file operations for large codebases
 - **Memory Efficient**: Immutable data structures and optimized string operations
-- **Parallel Processing**: Multi-threaded execution support (coming soon)
+- **Parallel Processing**: Multi-threaded execution support
 
 ### 🎯 Advanced Mutation Types
 - **Arithmetic**: `+`, `-`, `*`, `/`, `%`, `++`, `--`
@@ -20,15 +20,16 @@ An advanced, high-performance Dart mutation testing tool designed for comprehens
 - **Data Types**: `int`, `double`, `String`, `bool`, `List`, `Set`, `Map`
 - **Function Calls**: `print`, `add`, `length`, `toString`, etc.
 
-### 🔧 Flexible Mutation Modes
-- **Separate Mutations**: Generate individual files for each mutation type
-- **Cumulative Mutations**: Apply all mutations to a single file for comprehensive testing
-- **Line-Specific Tracking**: Precise comments showing exactly what mutations occurred where
+### 🔧 Flexible Configuration
+- **JSON-Only Configuration**: Professional configuration management with comprehensive validation
+- **Pattern Matching**: Advanced glob patterns for precise file targeting
+- **Line Range Targeting**: Apply mutations to specific line ranges in files
+- **Multiple Input Sources**: Support for files, directories, and complex patterns
 
 ### 📊 Enhanced CLI Experience
+- **Configuration Generation**: Auto-generate example configurations with `--generate-example`
 - **Verbose Logging**: Detailed progress tracking and performance metrics
 - **Error Handling**: Graceful degradation with comprehensive error reporting
-- **Configuration Options**: Flexible rule selection and output customization
 - **Progress Tracking**: Real-time feedback on processing status
 
 ## 📦 Installation
@@ -41,49 +42,109 @@ dart pub get
 
 ## 🛠️ Usage
 
-### Basic Usage
+### Quick Start
 ```bash
-# Simple arithmetic mutations
-dart run smart_mutation --input ./src --output ./mutations
+# Use default configuration (lib/, bin/ → mutations/)
+dart run smart_mutation
 
-# Multiple mutation types
-dart run smart_mutation -i ./src -o ./mutations --rules arithmetic,logical,relational
+# Generate example configuration
+dart run smart_mutation --generate-example
 
-# All mutation types with cumulative mode
-dart run smart_mutation -i ./src -o ./mutations --rules all --cumulative --verbose
+# Edit the generated config file, then run
+dart run smart_mutation --config smart_mutation_config.json
+
+# Or use short syntax
+dart run smart_mutation smart_mutation_config.json
+
+# Verbose output with default config
+dart run smart_mutation --verbose
 ```
 
-### Advanced Usage
+### Default Configuration
+
+When no configuration file is provided, the tool uses sensible defaults:
+
+```json
+{
+  "inputPaths": ["lib/", "bin/"],
+  "outputDir": "mutations",
+  "mutationTypes": ["arithmetic", "logical", "relational"],
+  "enableTracking": true,
+  "useCumulative": false,
+  "verbose": false,
+  "excludePatterns": [
+    "**/generated/**",
+    "**/*.g.dart", 
+    "**/test/**"
+  ],
+  "includePatterns": ["**/*.dart"],
+  "parallel": true
+}
+```
+
+This allows you to get started immediately:
+
 ```bash
-# Disable mutation tracking
-dart run smart_mutation -i ./src -o ./mutations --no-track
+# Quick start with default settings
+dart run smart_mutation
 
-# Verbose output with performance metrics
-dart run smart_mutation -i ./src -o ./mutations --verbose
-
-# Custom output directory structure
-dart run smart_mutation ./src ./custom_mutations
+# See what's happening
+dart run smart_mutation --verbose
 ```
 
-### Command Line Options
+### JSON Configuration
+
+The tool now exclusively uses JSON configuration files for maximum flexibility and reusability. Here's a complete example:
+
+```json
+{
+  "inputPaths": [
+    "lib/**/*.dart",
+    "bin/**/*.dart"
+  ],
+  "outputDir": "mutations",
+  "mutationTypes": ["arithmetic", "logical", "relational"],
+  "patterns": {
+    "include": ["*.dart"],
+    "exclude": ["*_test.dart", "**/generated/**"]
+  },
+  "lineRanges": {
+    "lib/main.dart": {"start": 10, "end": 50},
+    "lib/core.dart": {"start": 1, "end": 100}
+  },
+  "options": {
+    "verbose": true,
+    "trackMutations": true,
+    "cumulative": false,
+    "parallel": true
+  }
+}
 ```
+
+## Command Line Options
+
+The tool accepts JSON configuration files only. Available CLI options:
+
+```text
 Options:
-  -h, --help               Show help message
-  -v, --verbose            Enable verbose output with performance metrics
-  -i, --input=<DIR>        Input directory containing Dart files
-  -o, --output=<DIR>       Output directory for mutated files (default: docs/mutations)
-  -r, --rules=<TYPES>      Mutation types: arithmetic,logical,relational,datatype,functionCall,all
-  -t, --[no-]track         Add mutation tracking comments (default: enabled)
-  -c, --[no-]cumulative    Apply all mutations to single files vs. separate files
-  -p, --[no-]parallel      Enable parallel processing (default: enabled)
-      --threads=<NUM>      Number of parallel threads (default: auto-detect)
+  -h, --help                    Show this help message and exit
+  -c, --config=<config-file>    JSON configuration file path (optional)
+  -v, --verbose                 Enable verbose output and logging
+  -g, --generate-example        Generate example configuration file
+
+Usage:
+  dart run smart_mutation                              # Use default config
+  dart run smart_mutation --config my_config.json     # Use custom config
+  dart run smart_mutation my_config.json              # Short syntax
+  dart run smart_mutation --verbose                   # Default config with verbose output
 ```
 
-## 🏗️ Architecture & Optimizations
+## 🏗️ Architecture & Configuration
 
 ### Core Optimizations
 
 #### 1. **Regex Pattern Caching**
+
 ```dart
 static final Map<String, RegExp> _regexCache = <String, RegExp>{};
 
@@ -91,11 +152,13 @@ static RegExp _getRegex(String pattern) {
   return _regexCache.putIfAbsent(pattern, () => RegExp(pattern));
 }
 ```
+
 - Eliminates repeated regex compilation
 - 3x performance improvement for repeated mutations
 - Memory-efficient pattern storage
 
 #### 2. **Immutable Data Structures**
+
 ```dart
 static const List<MutationRule> _arithmeticRules = [
   MutationRule(
@@ -106,11 +169,13 @@ static const List<MutationRule> _arithmeticRules = [
 
 static List<MutationRule> getArithmeticRules() => List.unmodifiable(_arithmeticRules);
 ```
+
 - Thread-safe rule access
 - Prevents accidental rule modification
 - Better memory management
 
 #### 3. **Enhanced Error Handling**
+
 ```dart
 String? performMutation(String sourceCode, List<MutationRule> mutationRules, {
   int? startLine,
@@ -127,11 +192,13 @@ String? performMutation(String sourceCode, List<MutationRule> mutationRules, {
   }
 }
 ```
+
 - Graceful degradation on errors
 - Comprehensive validation
 - Detailed error reporting
 
 #### 4. **Precise Mutation Tracking**
+
 ```dart
 void _trackAffectedLines(
   String beforeCode, 
@@ -142,6 +209,7 @@ void _trackAffectedLines(
   // Track exactly which mutations affected which lines
 }
 ```
+
 - Line-specific mutation comments
 - Shows only relevant mutations per line
 - Better debugging and analysis
@@ -172,6 +240,7 @@ dart run coverage:format_coverage --lcov --in=coverage --out=coverage/lcov.info
 ## 📈 Mutation Examples
 
 ### Input Code
+
 ```dart
 class Calculator {
   static int add(int a, int b) {
@@ -185,13 +254,17 @@ class Calculator {
 ```
 
 ### Separate Mutations Mode
+
 Creates individual files:
+
 - `calculator_arithmetic_mutated.dart`: `a + b` → `a - b`
 - `calculator_logical_mutated.dart`: `&&` → `||`
 - `calculator_relational_mutated.dart`: `== 100` → `!= 100`
 
 ### Cumulative Mutations Mode
+
 Creates single file with all mutations:
+
 ```dart
 class Calculator {
   static double add(int a, int b) { // @ MUTATION: datatype
@@ -204,17 +277,40 @@ class Calculator {
 }
 ```
 
-## 🔮 Future Enhancements
+All mutations in one file with precise tracking comments.
 
-- [ ] Multi-threaded parallel processing
-- [ ] Custom mutation rule definitions
-- [ ] Integration with popular test frameworks
-- [ ] HTML/JSON reporting formats
-- [ ] VS Code extension
-- [ ] CI/CD pipeline integration
-- [ ] Machine learning-based mutation prioritization
+## 🔧 Configuration Options
+
+### JSON Configuration Schema
+
+| Field | Type | Description | Required |
+|-------|------|-------------|----------|
+| `inputPaths` | `string[]` | File/directory paths with glob support | ✅ |
+| `outputDir` | `string` | Output directory for mutated files | ✅ |
+| `mutationTypes` | `string[]` | Types: arithmetic, logical, relational, datatype, functionCall | ✅ |
+| `patterns.include` | `string[]` | Include file patterns (optional) | ❌ |
+| `patterns.exclude` | `string[]` | Exclude file patterns (optional) | ❌ |
+| `lineRanges` | `object` | File-specific line ranges (optional) | ❌ |
+| `options.verbose` | `boolean` | Enable verbose logging (default: false) | ❌ |
+| `options.trackMutations` | `boolean` | Add tracking comments (default: true) | ❌ |
+| `options.cumulative` | `boolean` | Apply all mutations to single files (default: false) | ❌ |
+| `options.parallel` | `boolean` | Enable parallel processing (default: true) | ❌ |
+
+### Migration from Legacy CLI
+
+If you were using the old directory-based CLI, migrate to JSON configuration:
+
+1. Generate example config: `dart run smart_mutation --generate-example`
+2. Edit the JSON file with your settings
+3. Run with new syntax: `dart run smart_mutation config.json`
 
 ## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/amazing-feature`
