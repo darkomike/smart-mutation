@@ -33,11 +33,11 @@ class SmartMutationConfig {
   /// Create default configuration for quick start
   factory SmartMutationConfig.defaultConfig() {
     return const SmartMutationConfig(
-      inputPaths: ['lib/', 'bin/'],
-      outputDir: 'mutations',
+      inputPaths: ['lib/', 'src/'],
+      outputDir: 'docs/mutations',
       mutationTypes: ['arithmetic', 'logical', 'relational'],
       enableTracking: true,
-      useCumulative: false,
+      useCumulative: true,
       verbose: false,
       excludePatterns: [
         '**/generated/**',
