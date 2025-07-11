@@ -6,6 +6,11 @@ import 'output_utils.dart';
 
 /// Run the mutation testing process with enhanced performance
 Future<void> runMutationTesting(CliConfig config) async {
+  // Validate required fields for legacy mode
+  if (config.inputDir == null || config.outputDir == null) {
+    throw Exception('Input and output directories are required for legacy mode');
+  }
+
   // Validate and create directories
   await validateDirectories(config);
 
@@ -15,7 +20,7 @@ Future<void> runMutationTesting(CliConfig config) async {
   final stopwatch = Stopwatch()..start();
   
   // Find all Dart files efficiently
-  final dartFiles = await findDartFiles(config.inputDir, config.verbose);
+  final dartFiles = await findDartFiles(config.inputDir!, config.verbose);
   
   if (dartFiles.isEmpty) {
     print('No Dart files found in input directory.');
@@ -37,12 +42,16 @@ Future<void> runMutationTesting(CliConfig config) async {
 
 /// Validate input directory and create output directory
 Future<void> validateDirectories(CliConfig config) async {
-  final inputDirectory = Directory(config.inputDir);
+  if (config.inputDir == null || config.outputDir == null) {
+    throw Exception('Input and output directories are required');
+  }
+
+  final inputDirectory = Directory(config.inputDir!);
   if (!await inputDirectory.exists()) {
     throw Exception('Input directory "${config.inputDir}" does not exist.');
   }
 
-  final outputDirectory = Directory(config.outputDir);
+  final outputDirectory = Directory(config.outputDir!);
   if (!await outputDirectory.exists()) {
     await outputDirectory.create(recursive: true);
     if (config.verbose) {
@@ -78,7 +87,7 @@ Future<ProcessingResults> processFiles(
   for (final dartFile in dartFiles) {
     try {
       if (config.verbose) {
-        print('Processing: ${path.relative(dartFile.path, from: config.inputDir)}');
+        print('Processing: ${path.relative(dartFile.path, from: config.inputDir!)}');
       }
       
       final mutationCount = await processSingleFile(dartFile, mutator, config);
@@ -105,11 +114,15 @@ Future<ProcessingResults> processFiles(
 
 /// Process a single file with optimized mutation handling
 Future<int> processSingleFile(File dartFile, Mutator mutator, CliConfig config) async {
+  if (config.inputDir == null || config.outputDir == null) {
+    throw Exception('Input and output directories are required');
+  }
+
   final code = await dartFile.readAsString();
   
   // Create relative path structure in output directory
-  final relativePath = path.relative(dartFile.path, from: config.inputDir);
-  final outputFileDir = path.dirname(path.join(config.outputDir, relativePath));
+  final relativePath = path.relative(dartFile.path, from: config.inputDir!);
+  final outputFileDir = path.dirname(path.join(config.outputDir!, relativePath));
   
   // Create subdirectories if needed
   await Directory(outputFileDir).create(recursive: true);

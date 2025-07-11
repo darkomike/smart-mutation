@@ -1,24 +1,32 @@
 import 'dart:io';
 import 'package:args/args.dart';
 import 'package:smart_mutation/mutator.dart';
+import 'config_model.dart';
 
 /// Configuration class for CLI arguments
 class CliConfig {
   const CliConfig({
-    required this.inputDir,
-    required this.outputDir,
-    required this.mutationRules,
-    required this.enableTracking,
-    required this.useCumulative,
-    required this.verbose,
+    this.inputDir,
+    this.outputDir,
+    this.mutationRules = const [],
+    this.enableTracking = true,
+    this.useCumulative = false,
+    this.verbose = false,
+    this.configFile,
+    this.generateExample = false,
   });
 
-  final String inputDir;
-  final String outputDir;
+  final String? inputDir;
+  final String? outputDir;
   final List<MutationRule> mutationRules;
   final bool enableTracking;
   final bool useCumulative;
   final bool verbose;
+  final String? configFile;
+  final bool generateExample;
+
+  /// Check if this is JSON configuration mode
+  bool get isJsonMode => configFile != null;
 }
 
 /// Data class for processing results
@@ -54,7 +62,28 @@ Future<CliConfig> parseArguments(List<String> arguments) async {
     exit(0);
   }
 
-  // Extract configuration values
+  // Generate example configuration if requested
+  if (results['generate-example'] as bool) {
+    final outputPath = results['example-output'] as String? ?? 'smart_mutation_config.json';
+    print('Generating example configuration file: $outputPath');
+    
+    await SmartMutationConfig.generateExample(outputPath);
+    
+    print('Example configuration file generated successfully!');
+    print('Edit the file and run with: dart run smart_mutation --config $outputPath');
+    exit(0);
+  }
+
+  // Check for JSON configuration mode
+  final configFile = results['config'] as String?;
+  if (configFile != null) {
+    return CliConfig(
+      configFile: configFile,
+      verbose: results['verbose'] as bool,
+    );
+  }
+
+  // Legacy directory mode
   var inputDir = results['input'] as String?;
   var outputDir = results['output'] as String?;
 
@@ -64,9 +93,11 @@ Future<CliConfig> parseArguments(List<String> arguments) async {
     outputDir = results.rest[1];
   }
 
-  // Validate required arguments
+  // Validate required arguments for legacy mode
   if (inputDir == null || outputDir == null) {
-    print('Error: Both input and output directories are required.');
+    print('Error: For directory mode, both input and output directories are required.');
+    print('       For JSON mode, use --config <config-file.json>');
+    print('       To generate example config, use --generate-example');
     print('');
     printUsage(parser);
     exit(1);
@@ -81,7 +112,7 @@ Future<CliConfig> parseArguments(List<String> arguments) async {
   final mutationRules = parseMutationRules(ruleTypesString);
   
   if (verbose) {
-    print('Configuration:');
+    print('Configuration (Legacy Directory Mode):');
     print('  Input directory: $inputDir');
     print('  Output directory: $outputDir');
     print('  Mutation rules: $ruleTypesString');
@@ -111,28 +142,39 @@ ArgParser createArgParser() {
         abbr: 'v',
         negatable: false,
         help: 'Show verbose output.')
+    ..addOption('config',
+        abbr: 'c',
+        help: 'Path to JSON configuration file. When used, other options are ignored.',
+        valueHelp: 'CONFIG_FILE')
+    ..addFlag('generate-example',
+        abbr: 'g',
+        negatable: false,
+        help: 'Generate an example JSON configuration file and exit.')
+    ..addOption('example-output',
+        help: 'Output path for example configuration file.',
+        defaultsTo: 'smart_mutation_config.json',
+        valueHelp: 'FILE')
     ..addOption('input',
         abbr: 'i',
-        help: 'Input directory containing Dart files to mutate.',
+        help: 'Input directory containing Dart files to mutate (legacy mode).',
         valueHelp: 'DIR')
     ..addOption('output',
         abbr: 'o',
-        help: 'Output directory for mutated files.',
+        help: 'Output directory for mutated files (legacy mode).',
         defaultsTo: 'docs/mutations',
         valueHelp: 'DIR')
     ..addOption('rules',
         abbr: 'r',
-        help: 'Comma-separated list of mutation types: arithmetic,logical,relational,datatype,functionCall,all',
+        help: 'Comma-separated list of mutation types (legacy mode): arithmetic,logical,relational,datatype,functionCall,all',
         defaultsTo: 'arithmetic',
         valueHelp: 'TYPES')
     ..addFlag('track',
         abbr: 't',
         defaultsTo: true,
-        help: 'Add @ MUTATION comments to track where mutations occurred.')
+        help: 'Add @ MUTATION comments to track where mutations occurred (legacy mode).')
     ..addFlag('cumulative',
-        abbr: 'c',
         defaultsTo: false,
-        help: 'Apply all mutations cumulatively to a single file instead of creating separate files.')
+        help: 'Apply all mutations cumulatively to a single file (legacy mode).')
     ..addFlag('parallel',
         abbr: 'p',
         defaultsTo: true,
@@ -193,12 +235,20 @@ List<MutationRule> parseMutationRules(String ruleTypesString) {
 void printUsage(ArgParser parser) {
   print('Smart Mutation - Dart Mutation Testing Tool');
   print('');
-  print('Usage: dart run smart_mutation [options] [input_directory] [output_directory]');
+  print('Usage:');
+  print('  JSON Mode (Recommended):');
+  print('    dart run smart_mutation --config <config-file.json>');
+  print('  Legacy Directory Mode:');
+  print('    dart run smart_mutation [options] [input_directory] [output_directory]');
   print('');
   print('Options:');
   print(parser.usage);
   print('');
-  print('Available mutation types:');
+  print('JSON Configuration Mode:');
+  print('  Use --config to specify a JSON configuration file with advanced settings.');
+  print('  Generate example: dart run smart_mutation --generate-example');
+  print('');
+  print('Legacy Directory Mode - Available mutation types:');
   print('  arithmetic   - Mutate arithmetic operators (+, -, *, /, %, ++, --)');
   print('  logical      - Mutate logical operators (&&, ||, !)');
   print('  relational   - Mutate relational operators (==, !=, >, <, >=, <=)');
@@ -206,17 +256,15 @@ void printUsage(ArgParser parser) {
   print('  functionCall - Mutate function calls (print, add, length, etc.)');
   print('  all          - Apply all mutation types');
   print('');
-  print('Note: By default, when multiple rule types are specified, separate mutation');
-  print('      files are generated for each type (e.g., file_arithmetic_mutated.dart,');
-  print('      file_logical_mutated.dart, etc.). Use --cumulative to apply all');
-  print('      mutations to a single file instead.');
-  print('');
   print('Examples:');
+  print('  # JSON mode (recommended)');
+  print('  dart run smart_mutation --generate-example');
+  print('  dart run smart_mutation --config my_config.json');
+  print('');
+  print('  # Legacy directory mode');
   print('  dart run smart_mutation --input ./src --output ./mutations');
   print('  dart run smart_mutation -i ./src -o ./mutations --rules arithmetic,logical');
   print('  dart run smart_mutation -i ./src -o ./mutations -r all --verbose');
-  print('  dart run smart_mutation -i ./src -o ./mutations -r all --cumulative  # All mutations in one file');
-  print('  dart run smart_mutation -i ./src -o ./mutations --no-track  # Disable tracking');
+  print('  dart run smart_mutation -i ./src -o ./mutations -r all --cumulative');
   print('  dart run smart_mutation ./src ./mutations  # Positional arguments');
-  print('  dart run smart_mutation --help  # Show this help');
 }
