@@ -1,0 +1,18 @@
+{
+  "inputPaths": [
+    "lib/mutator.dart"
+  ],
+  "outputDir": "test_mutations",
+  "mutationTypes": [
+    "arithmetic"
+  ],
+  "enableTracking": true,
+  "useCumulative": false,
+  "verbose": true,
+  "excludePatterns": [],
+  "includePatterns": [
+    "**/*.dart"
+  ],
+  "lineRanges": {},
+  "parallel": true
+}
