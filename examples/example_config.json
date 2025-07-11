@@ -1,0 +1,16 @@
+{
+  "inputPaths": ["examples/basic_calculator/lib"],
+  "outputDir": "output",
+  "mutationTypes": ["arithmetic", "logical", "relational", "datatype"],
+  "enableTracking": true,
+  "useCumulative": false,
+  "verbose": true,
+  "parallel": true,
+  "maxThreads": 4,
+  "testCommand": "dart test",
+  "workingDirectory": "examples/basic_calculator",
+  "excludePatterns": ["**/*_test.dart", "**/test/**"],
+  "includePatterns": ["**/*.dart"],
+  "lineRanges": {},
+  "reportFormat": "html"
+}

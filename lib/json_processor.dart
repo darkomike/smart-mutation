@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:smart_mutation/mutator.dart';
 import 'package:path/path.dart' as path;
 import 'config_model.dart';
+import 'mutation_reporter.dart';
 
 /// Result of processing with detailed information
 class ProcessingResults {
@@ -69,6 +70,11 @@ class JsonConfigProcessor {
     final results = await _processFilesWithConfig(dartFiles, mutator, config);
     
     stopwatch.stop();
+    
+    // Run mutation tests if configured
+    if (config.runTests && results.outputFiles.isNotEmpty) {
+      await _runMutationTests(results, config);
+    }
     
     // Print comprehensive summary
     _printConfigSummary(results, stopwatch.elapsed, config);
@@ -242,16 +248,14 @@ class JsonConfigProcessor {
     final lineRange = config.lineRanges[relativePath] ?? 
                      config.lineRanges[dartFile.absolute.path];
     
-    // Create relative path structure in output directory
-    final outputFileDir = path.dirname(path.join(config.outputDir, relativePath));
-    
-    // Create subdirectories if needed
-    await Directory(outputFileDir).create(recursive: true);
-    
-    // Prepare file paths
+    // Create flattened output structure (remove input path prefix)
     final fileName = path.basenameWithoutExtension(dartFile.path);
     final fileExtension = path.extension(dartFile.path);
-    final basePath = path.join(outputFileDir, fileName);
+    
+    // Create output directory if needed
+    await Directory(config.outputDir).create(recursive: true);
+    
+    final basePath = path.join(config.outputDir, fileName);
     
     if (config.useCumulative) {
       return await _processCumulativeWithConfig(
@@ -334,6 +338,124 @@ class JsonConfigProcessor {
         print('  No mutations found to apply in ${path.basename(originalFile.path)}');
       }
       return const FileProcessingResult(mutationCount: 0, outputPaths: []);
+    }
+  }
+
+  Future<void> _runMutationTests(ProcessingResults results, SmartMutationConfig config) async {
+    print('\n🧪 Running mutation tests...');
+    
+    if (config.testCommand == null) {
+      print('⚠️  No test command specified in configuration');
+      return;
+    }
+    
+    if (results.outputFiles.isEmpty) {
+      print('⚠️  No mutation files to test');
+      return;
+    }
+    
+    // Group mutation files by their original source
+    final mutationsByOriginal = <String, List<String>>{};
+    
+    for (final mutationFile in results.outputFiles) {
+      // Extract original file path from mutation file name
+      final fileName = mutationFile.split('/').last;
+      String originalFile;
+      
+      // Handle the flattened output structure - find corresponding input file
+      if (fileName.contains('_arithmetic_') || 
+          fileName.contains('_logical_') || 
+          fileName.contains('_relational_') ||
+          fileName.contains('_datatype_') ||
+          fileName.contains('_function_')) {
+        
+        // Extract base name (remove mutation suffix)
+        final baseName = fileName.split('_')[0] + '.dart';
+        
+        // Find matching original file from input paths
+        String? matchingInput;
+        for (final inputPath in config.inputPaths) {
+          if (inputPath.endsWith(baseName) || inputPath.contains(baseName)) {
+            matchingInput = inputPath;
+            break;
+          }
+        }
+        
+        originalFile = matchingInput ?? config.inputPaths.first;
+      } else {
+        originalFile = config.inputPaths.first;
+      }
+      
+      mutationsByOriginal.putIfAbsent(originalFile, () => []).add(mutationFile);
+    }
+    
+    final allTestResults = <MutationTestResult>[];
+    
+    // Run tests for each original file and its mutations
+    for (final entry in mutationsByOriginal.entries) {
+      final originalFile = entry.key;
+      final mutationFiles = entry.value;
+      
+      print('Testing mutations for: $originalFile');
+      
+      final testResults = await Mutator.runMutationTestSuite(
+        originalFilePath: originalFile,
+        mutatedFilePaths: mutationFiles,
+        testCommand: config.testCommand,
+        verbose: false,
+      );
+      
+      allTestResults.addAll(testResults);
+    }
+    
+    // Print comprehensive test results summary
+    await _printEnhancedMutationTestSummary(allTestResults, config);
+  }
+  
+  Future<void> _printEnhancedMutationTestSummary(
+    List<MutationTestResult> results, 
+    SmartMutationConfig config
+  ) async {
+    if (results.isEmpty) {
+      print('\n📊 No mutation tests were executed.');
+      return;
+    }
+
+    // Generate comprehensive report
+    final report = await MutationTestReporter.generateReport(
+      results: results,
+      mutatedFiles: results.map((r) => r.mutationFile ?? '').where((f) => f.isNotEmpty).toList(),
+      originalFile: config.inputPaths.first,
+      includeDetailedAnalysis: true,
+    );
+
+    // Print detailed console report
+    MutationTestReporter.printDetailedReport(report);
+
+    // Save detailed report as HTML file (primary format)
+    final htmlReportPath = '${config.outputDir}/mutation_test_report.html';
+    await MutationTestReporter.generateReport(
+      results: results,
+      mutatedFiles: results.map((r) => r.mutationFile ?? '').where((f) => f.isNotEmpty).toList(),
+      originalFile: config.inputPaths.first,
+      outputPath: htmlReportPath,
+      includeDetailedAnalysis: true,
+      format: 'html',
+    );
+    print('\n🌐 Interactive HTML report saved to: $htmlReportPath');
+
+    // Also save JSON report if verbose mode for backwards compatibility
+    if (config.verbose) {
+      final jsonReportPath = '${config.outputDir}/mutation_test_report.json';
+      await MutationTestReporter.generateReport(
+        results: results,
+        mutatedFiles: results.map((r) => r.mutationFile ?? '').where((f) => f.isNotEmpty).toList(),
+        originalFile: config.inputPaths.first,
+        outputPath: jsonReportPath,
+        includeDetailedAnalysis: true,
+        format: 'json',
+      );
+      print('📄 JSON report also saved to: $jsonReportPath');
     }
   }
 

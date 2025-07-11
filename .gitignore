@@ -8,10 +8,17 @@ build/
 *.dylib
 *.dll
 
+# Mutation testing outputs (exclude generated files)
+*_mutations/
+*mutations/
+*_mutated.dart
+*_mutated_*.dart
+mutation_test_report.html
+mutation_test_report.json
+
 # Test outputs and temporary files
 test_output*/
 test_input*/
-*_mutated.dart
 coverage/
 doc/api/
 
@@ -48,4 +55,7 @@ pubspec.lock
 # Demo and test files (for development)
 demo_*.dart
 test_*.dart
+*_demo_*.json
+*_test_*.json
+timeout_*.dart
 sample_*.dart

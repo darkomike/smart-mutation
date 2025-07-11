@@ -57,27 +57,38 @@ dart run smart_mutation --config smart_mutation_config.json
 dart run smart_mutation smart_mutation_config.json
 
 # Verbose output with default config
-dart run smart_mutation --verbose
+### Quick Start with Examples
+
+```bash
+# Test the included calculator example
+dart run bin/smart_mutation.dart --config examples/example_config.json
+
+# Use default configuration for your project
+dart run bin/smart_mutation.dart --config smart_mutation_config.json
+
+# Run with verbose output
+dart run bin/smart_mutation.dart --config smart_mutation_config.json --verbose
 ```
 
 ### Default Configuration
 
-When no configuration file is provided, the tool uses sensible defaults:
+The tool includes a clean default configuration (`smart_mutation_config.json`):
 
 ```json
 {
-  "inputPaths": ["lib/", "bin/"],
-  "outputDir": "mutations",
+  "inputPaths": ["lib"],
+  "outputDir": "mutations_output",
   "mutationTypes": ["arithmetic", "logical", "relational"],
   "enableTracking": true,
   "useCumulative": false,
   "verbose": false,
-  "excludePatterns": [
-    "**/generated/**",
-    "**/*.g.dart", 
-    "**/test/**"
-  ],
+  "parallel": false,
+  "maxThreads": 2,
+  "excludePatterns": ["**/*_test.dart", "**/test/**"],
   "includePatterns": ["**/*.dart"],
+  "lineRanges": {},
+  "reportFormat": "html"
+}
   "parallel": true
 }
 ```
@@ -86,27 +97,30 @@ This allows you to get started immediately:
 
 ```bash
 # Quick start with default settings
-dart run smart_mutation
+### Working with Examples
 
-# See what's happening
-dart run smart_mutation --verbose
+```bash
+# Navigate to examples directory
+cd examples/
+
+# Run mutation testing on the calculator example
+cd ..
+dart run bin/smart_mutation.dart --config examples/example_config.json
+
+# Check the generated reports
+open examples/basic_calculator/output/mutation_test_report.html
 ```
 
-### JSON Configuration
+### GitHub-Style HTML Reports
 
-The tool now exclusively uses JSON configuration files for maximum flexibility and reusability. Here's a complete example:
+The tool generates beautiful GitHub-style HTML reports featuring:
 
-```json
-{
-  "inputPaths": [
-    "lib/**/*.dart",
-    "bin/**/*.dart"
-  ],
-  "outputDir": "mutations",
-  "mutationTypes": ["arithmetic", "logical", "relational"],
-  "patterns": {
-    "include": ["*.dart"],
-    "exclude": ["*_test.dart", "**/generated/**"]
+- **Code Diff Views**: Line-by-line mutation changes like GitHub PRs
+- **Status Badges**: ✅ Detected / ❌ Missed mutations  
+- **Quality Metrics**: Test suite grading and recommendations
+- **Professional Design**: Authentic GitHub colors and typography
+
+See `docs/GITHUB_STYLE_COMPLETE.md` for detailed feature documentation.
   },
   "lineRanges": {
     "lib/main.dart": {"start": 10, "end": 50},
@@ -137,6 +151,33 @@ Usage:
   dart run smart_mutation --config my_config.json     # Use custom config
   dart run smart_mutation my_config.json              # Short syntax
   dart run smart_mutation --verbose                   # Default config with verbose output
+```
+
+## 📁 Project Structure
+
+```
+smart_mutation/
+├── 📂 bin/                    # Executable entry point
+│   └── smart_mutation.dart    # Main CLI application
+├── 📂 lib/                    # Core library code
+│   ├── cli_config.dart        # CLI argument parsing
+│   ├── config_model.dart      # Configuration models
+│   ├── json_processor.dart    # JSON config processor
+│   ├── mutation_reporter.dart # GitHub-style HTML reports
+│   └── mutator.dart           # Core mutation engine
+├── 📂 test/                   # Test suite
+│   └── mutator_test.dart      # Unit tests
+├── 📂 examples/               # Example projects
+│   ├── basic_calculator/      # Calculator example
+│   ├── example_config.json    # Example configuration
+│   └── README.md              # Examples documentation
+├── 📂 docs/                   # Additional documentation
+│   ├── GITHUB_STYLE_COMPLETE.md
+│   ├── HTML_REPORTS_ENHANCEMENT.md
+│   └── OPTIMIZATION_SUMMARY.md
+├── smart_mutation_config.json # Default configuration
+├── pubspec.yaml               # Package configuration
+└── README.md                  # This file
 ```
 
 ## 🏗️ Architecture & Configuration

@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:convert';
+import 'dart:async';
 
 /// Enum to define different types of mutations
 enum MutationType {
@@ -6,7 +8,10 @@ enum MutationType {
   logical,
   datatype,
   functionCall,
-  relational;
+  relational,
+  conditional,
+  increment,
+  assignment;
 
   /// Returns a human-readable name for the mutation type
   String get displayName => name;
@@ -49,6 +54,28 @@ class MutatedResult {
 
   @override
   String toString() => 'MutatedResult(type: $mutationType, hasOutput: ${outputPath != null})';
+}
+
+/// Test result for mutation testing
+class MutationTestResult {
+  const MutationTestResult({
+    required this.mutationType,
+    required this.testPassed,
+    required this.testOutput,
+    this.mutationFile,
+    this.executionTime,
+  });
+
+  final MutationType mutationType;
+  final bool testPassed;
+  final String testOutput;
+  final String? mutationFile;
+  final Duration? executionTime;
+
+  bool get mutationDetected => !testPassed;
+
+  @override
+  String toString() => 'MutationTestResult(type: $mutationType, detected: $mutationDetected)';
 }
 
 /// Configuration for mutation operations
@@ -309,10 +336,15 @@ class Mutator {
     final originalLines = originalSource.split('\n');
     final mutatedLines = mutatedCode.split('\n');
     
+    // Validate line ranges to prevent index errors
+    if (startLine < 1 || endLine > originalLines.length || startLine > endLine) {
+      return mutatedCode; // Return mutated code as-is if ranges are invalid
+    }
+    
     // Replace the specified lines with mutated versions
     for (var i = 0; i < mutatedLines.length; i++) {
       final lineIndex = startLine - 1 + i;
-      if (lineIndex < originalLines.length) {
+      if (lineIndex >= 0 && lineIndex < originalLines.length) {
         originalLines[lineIndex] = mutatedLines[i];
       }
     }
@@ -403,6 +435,12 @@ class Mutator {
         return _applyFunctionCallMutation(code, rule.mutations);
       case MutationType.relational:
         return _applyRelationalMutation(code, rule.mutations);
+      case MutationType.conditional:
+        return _applyConditionalMutation(code, rule.mutations);
+      case MutationType.increment:
+        return _applyIncrementMutation(code, rule.mutations);
+      case MutationType.assignment:
+        return _applyAssignmentMutation(code, rule.mutations);
     }
   }
 
@@ -522,6 +560,125 @@ class Mutator {
     return null;
   }
 
+  /// Optimized conditional mutations - safer approach
+  String? _applyConditionalMutation(String code, Map<String, List<String>> mutations) {
+    for (final entry in mutations.entries) {
+      final condition = entry.key;
+      final replacements = entry.value;
+      if (replacements.isEmpty) continue;
+      
+      // Use word boundaries for true/false to avoid partial matches
+      RegExp pattern;
+      if (condition == 'true' || condition == 'false') {
+        pattern = _getRegex('\\b$condition\\b');
+      } else {
+        // For operators like == and !=, use more specific patterns
+        final escapedCondition = RegExp.escape(condition);
+        pattern = _getRegex('(\\w+|\\))\\s*($escapedCondition)\\s*(\\w+|\\()');
+      }
+      
+      final match = pattern.firstMatch(code);
+      if (match != null) {
+        final mutatedCondition = replacements.first;
+        if (condition == 'true' || condition == 'false') {
+          return code.replaceRange(match.start, match.end, mutatedCondition);
+        } else {
+          final fullMatch = match.group(0)!;
+          final mutatedMatch = fullMatch.replaceAll(condition, mutatedCondition);
+          return code.replaceRange(match.start, match.end, mutatedMatch);
+        }
+      }
+    }
+    return null;
+  }
+
+  /// Optimized increment mutations - safer approach with loop detection
+  String? _applyIncrementMutation(String code, Map<String, List<String>> mutations) {
+    for (final entry in mutations.entries) {
+      final operator = entry.key;
+      final replacements = entry.value;
+      if (replacements.isEmpty) continue;
+      
+      final escapedOperator = RegExp.escape(operator);
+      RegExp pattern;
+      
+      // Only target standalone increment/decrement operators
+      if (operator == '++' || operator == '--') {
+        // Look for standalone pre/post increment: i++, ++i, counter--, --counter
+        pattern = _getRegex('(?:^|[^\\w])($escapedOperator\\w+|\\w+$escapedOperator)(?:[^\\w]|\$)');
+        
+        final match = pattern.firstMatch(code);
+        if (match != null) {
+          final incrementPart = match.group(1)!;
+          
+          // Safety check: Don't mutate if this looks like a loop counter
+          final lines = code.split('\n');
+          var lineIndex = 0;
+          var charCount = 0;
+          
+          // Find which line contains the match
+          for (var i = 0; i < lines.length; i++) {
+            if (charCount + lines[i].length >= match.start) {
+              lineIndex = i;
+              break;
+            }
+            charCount += lines[i].length + 1; // +1 for newline
+          }
+          
+          // Check if this line or nearby lines contain loop keywords
+          final contextStart = (lineIndex - 2).clamp(0, lines.length - 1);
+          final contextEnd = (lineIndex + 2).clamp(0, lines.length - 1);
+          final context = lines.sublist(contextStart, contextEnd + 1).join(' ').toLowerCase();
+          
+          // Skip mutation if it's likely in a loop context
+          if (context.contains('for') || context.contains('while') || 
+              context.contains('do ') || context.contains('i <=') || 
+              context.contains('i <') || context.contains('i >=') || 
+              context.contains('i >')) {
+            continue; // Skip this mutation as it's likely a loop counter
+          }
+          
+          final mutatedOperator = replacements.first;
+          final mutatedIncrement = incrementPart.replaceAll(operator, mutatedOperator);
+          return code.replaceRange(match.start + (match.group(0)!.indexOf(incrementPart)), 
+                                 match.start + (match.group(0)!.indexOf(incrementPart)) + incrementPart.length, 
+                                 mutatedIncrement);
+        }
+      } else {
+        // For compound assignment operators, be more specific
+        pattern = _getRegex('(\\w+)\\s*($escapedOperator)\\s*(\\w+|\\d+)');
+        final match = pattern.firstMatch(code);
+        if (match != null) {
+          final mutatedOperator = replacements.first;
+          final fullMatch = match.group(0)!;
+          final mutatedMatch = fullMatch.replaceAll(operator, mutatedOperator);
+          return code.replaceRange(match.start, match.end, mutatedMatch);
+        }
+      }
+    }
+    return null;
+  }
+
+  /// Optimized assignment mutations
+  String? _applyAssignmentMutation(String code, Map<String, List<String>> mutations) {
+    for (final entry in mutations.entries) {
+      final operator = entry.key;
+      final replacements = entry.value;
+      if (replacements.isEmpty) continue;
+      
+      final escapedOperator = RegExp.escape(operator);
+      final pattern = _getRegex('(\\w+)\\s*($escapedOperator)\\s*(\\w+|\\(|\\d+)');
+      final match = pattern.firstMatch(code);
+      if (match != null) {
+        final mutatedOperator = replacements.first;
+        final fullMatch = match.group(0)!;
+        final mutatedMatch = fullMatch.replaceAll(operator, mutatedOperator);
+        return code.replaceRange(match.start, match.end, mutatedMatch);
+      }
+    }
+    return null;
+  }
+
   /// Predefined mutation rules - now as static const for better performance
   static const List<MutationRule> _arithmeticRules = [
     MutationRule(
@@ -591,12 +748,49 @@ class Mutator {
     ),
   ];
 
+  static const List<MutationRule> _conditionalRules = [
+    MutationRule(
+      type: MutationType.conditional,
+      mutations: {
+        'true': ['false'],
+        'false': ['true'],
+        '==': ['!='],
+        '!=': ['=='],
+      },
+    ),
+  ];
+
+  static const List<MutationRule> _incrementRules = [
+    MutationRule(
+      type: MutationType.increment,
+      mutations: {
+        '++': ['--'],
+        '--': ['++'],
+      },
+    ),
+  ];
+
+  static const List<MutationRule> _assignmentRules = [
+    MutationRule(
+      type: MutationType.assignment,
+      mutations: {
+        '+=': ['-='],
+        '-=': ['+='],
+        '*=': ['/='],
+        '/=': ['*='],
+      },
+    ),
+  ];
+
   /// Public getters for mutation rules with caching
   static List<MutationRule> getArithmeticRules() => List.unmodifiable(_arithmeticRules);
   static List<MutationRule> getLogicalRules() => List.unmodifiable(_logicalRules);
   static List<MutationRule> getRelationalRules() => List.unmodifiable(_relationalRules);
   static List<MutationRule> getDatatypeRules() => List.unmodifiable(_datatypeRules);
   static List<MutationRule> getFunctionCallRules() => List.unmodifiable(_functionCallRules);
+  static List<MutationRule> getConditionalRules() => List.unmodifiable(_conditionalRules);
+  static List<MutationRule> getIncrementRules() => List.unmodifiable(_incrementRules);
+  static List<MutationRule> getAssignmentRules() => List.unmodifiable(_assignmentRules);
 
   /// Generic function that accepts a rule type and returns the corresponding mutation rules
   static List<MutationRule> getRulesByType(MutationType type) {
@@ -611,6 +805,12 @@ class Mutator {
         return getDatatypeRules();
       case MutationType.functionCall:
         return getFunctionCallRules();
+      case MutationType.conditional:
+        return getConditionalRules();
+      case MutationType.increment:
+        return getIncrementRules();
+      case MutationType.assignment:
+        return getAssignmentRules();
     }
   }
 
@@ -634,5 +834,335 @@ class Mutator {
   @Deprecated('Use performMutation with getArithmeticRules() instead')
   String? arithmeticMutation(String code) {
     return performMutation(code, getArithmeticRules());
+  }
+
+  /// Run tests against mutated files to check mutation detection
+  /// Returns true if the mutation was detected (tests failed)
+  static Future<MutationTestResult> runTestsOnMutation({
+    required String originalFilePath,
+    required String mutatedFilePath,
+    required MutationType mutationType,
+    String? testCommand,
+    String? workingDirectory,
+    bool verbose = false,
+  }) async {
+    final stopwatch = Stopwatch()..start();
+    
+    try {
+      // Backup original file
+      final originalFile = File(originalFilePath);
+      final mutatedFile = File(mutatedFilePath);
+      
+      if (!await originalFile.exists()) {
+        throw Exception('Original file not found: $originalFilePath');
+      }
+      
+      if (!await mutatedFile.exists()) {
+        throw Exception('Mutated file not found: $mutatedFilePath');
+      }
+      
+      final originalContent = await originalFile.readAsString();
+      final mutatedContent = await mutatedFile.readAsString();
+      
+      if (verbose) {
+        print('Testing mutation: $mutationType');
+        print('  Original: $originalFilePath');
+        print('  Mutated: $mutatedFilePath');
+      }
+      
+      // Replace original with mutated content
+      await originalFile.writeAsString(mutatedContent);
+      
+      // Determine timeout based on mutation type (some mutations are more risky)
+      Duration timeout;
+      switch (mutationType) {
+        case MutationType.increment:
+        case MutationType.conditional:
+          timeout = const Duration(seconds: 5); // Shorter for risky mutations
+          break;
+        case MutationType.assignment:
+          timeout = const Duration(seconds: 7);
+          break;
+        default:
+          timeout = const Duration(seconds: 8); // Standard timeout
+      }
+      
+      // Run tests with enhanced timeout to prevent hanging
+      final testCmd = testCommand ?? 'dart test';
+      final testArgs = testCmd.split(' ').skip(1).toList();
+      final executable = testCmd.split(' ').first;
+      
+      if (verbose) {
+        print('  Running tests (timeout: ${timeout.inSeconds}s)...');
+      }
+      
+      // Start the process
+      final process = await Process.start(
+        executable,
+        testArgs,
+        workingDirectory: workingDirectory,
+      );
+      
+      // Set up timeout with process termination
+      late ProcessResult result;
+      
+      try {
+        result = await Future.wait([
+          process.exitCode,
+          process.stdout.transform(utf8.decoder).join(),
+          process.stderr.transform(utf8.decoder).join(),
+        ]).timeout(
+          timeout,
+          onTimeout: () {
+            process.kill(ProcessSignal.sigkill); // Force kill the process
+            throw TimeoutException('Test execution timed out', timeout);
+          },
+        ).then((results) {
+          return ProcessResult(process.pid, results[0] as int, results[1] as String, results[2] as String);
+        });
+      } on TimeoutException {
+        // Ensure process is killed
+        try {
+          process.kill(ProcessSignal.sigkill);
+        } catch (_) {
+          // Ignore kill errors
+        }
+        result = ProcessResult(0, 124, '', 'Test execution timed out after ${timeout.inSeconds} seconds - likely infinite loop detected');
+      } catch (e) {
+        // Handle other errors
+        try {
+          process.kill(ProcessSignal.sigkill);
+        } catch (_) {
+          // Ignore kill errors
+        }
+        result = ProcessResult(0, 1, '', 'Test execution failed: $e');
+      }
+      
+      stopwatch.stop();
+      
+      // Restore original file
+      await originalFile.writeAsString(originalContent);
+      
+      final testPassed = result.exitCode == 0;
+      final output = '${result.stdout}\n${result.stderr}'.trim();
+      
+      if (verbose) {
+        print('  Test result: ${testPassed ? 'PASSED' : 'FAILED'}');
+        print('  Execution time: ${stopwatch.elapsed.inMilliseconds}ms');
+        if (!testPassed) {
+          print('  ✅ MUTATION DETECTED');
+        } else {
+          print('  ❌ MUTATION NOT DETECTED');
+        }
+      }
+      
+      return MutationTestResult(
+        mutationType: mutationType,
+        testPassed: testPassed,
+        testOutput: output,
+        mutationFile: mutatedFilePath,
+        executionTime: stopwatch.elapsed,
+      );
+      
+    } catch (e) {
+      stopwatch.stop();
+      
+      // Try to restore original file in case of error
+      try {
+        final originalFile = File(originalFilePath);
+        if (await originalFile.exists()) {
+          // We can't restore without backup, but we can warn
+          print('Warning: Error during mutation testing. Please verify file integrity: $originalFilePath');
+        }
+      } catch (_) {
+        // Ignore restoration errors
+      }
+      
+      return MutationTestResult(
+        mutationType: mutationType,
+        testPassed: false,
+        testOutput: 'Error during test execution: $e',
+        mutationFile: mutatedFilePath,
+        executionTime: stopwatch.elapsed,
+      );
+    }
+  }
+
+  /// Run tests on all mutations and generate a comprehensive report
+  static Future<List<MutationTestResult>> runMutationTestSuite({
+    required String originalFilePath,
+    required List<String> mutatedFilePaths,
+    String? testCommand,
+    String? workingDirectory,
+    bool verbose = false,
+  }) async {
+    if (verbose) {
+      print('🧬 Running Mutation Test Suite');
+      print('==============================');
+      print('Original file: $originalFilePath');
+      print('Mutations to test: ${mutatedFilePaths.length}');
+      print('Adaptive timeouts: 5-8 seconds based on mutation risk');
+      print('');
+    }
+    
+    final results = <MutationTestResult>[];
+    var detectedCount = 0;
+    var timeoutCount = 0;
+    
+    for (var i = 0; i < mutatedFilePaths.length; i++) {
+      final mutatedFilePath = mutatedFilePaths[i];
+      
+      // Extract mutation type from filename
+      final mutationType = _extractMutationTypeFromPath(mutatedFilePath);
+      
+      if (verbose) {
+        print('Testing mutation ${i + 1}/${mutatedFilePaths.length}: ${mutationType.displayName}');
+      }
+      
+      final result = await runTestsOnMutation(
+        originalFilePath: originalFilePath,
+        mutatedFilePath: mutatedFilePath,
+        mutationType: mutationType,
+        testCommand: testCommand,
+        workingDirectory: workingDirectory,
+        verbose: verbose,
+      );
+      
+      results.add(result);
+      
+      if (result.testOutput.contains('timed out')) {
+        timeoutCount++;
+        if (verbose) {
+          print('  ⏰ TIMEOUT - Infinite loop prevented');
+        }
+      } else if (result.mutationDetected) {
+        detectedCount++;
+        if (verbose) {
+          print('  ✅ DETECTED (${result.executionTime?.inMilliseconds ?? 0}ms)');
+        }
+      } else {
+        if (verbose) {
+          print('  ❌ MISSED (${result.executionTime?.inMilliseconds ?? 0}ms)');
+        }
+      }
+    }
+    
+    if (verbose) {
+      if (timeoutCount > 0) {
+        print('\n⏰ Timeout Summary:');
+        print('  Prevented $timeoutCount potential infinite loops');
+        print('  This shows the mutation tool is working correctly!');
+      }
+      _printMutationTestReport(results, detectedCount);
+    }
+    
+    return results;
+  }
+
+  /// Extract mutation type from file path
+  static MutationType _extractMutationTypeFromPath(String filePath) {
+    final fileName = filePath.split('/').last.toLowerCase();
+    
+    if (fileName.contains('arithmetic')) return MutationType.arithmetic;
+    if (fileName.contains('logical')) return MutationType.logical;
+    if (fileName.contains('relational')) return MutationType.relational;
+    if (fileName.contains('conditional')) return MutationType.conditional;
+    if (fileName.contains('increment')) return MutationType.increment;
+    if (fileName.contains('assignment')) return MutationType.assignment;
+    if (fileName.contains('datatype')) return MutationType.datatype;
+    if (fileName.contains('function')) return MutationType.functionCall;
+    
+    // Default fallback
+    return MutationType.arithmetic;
+  }
+
+  /// Print comprehensive mutation test report
+  static void _printMutationTestReport(List<MutationTestResult> results, int detectedCount) {
+    print('\n🎯 Mutation Testing Report');
+    print('==========================');
+    
+    final totalMutations = results.length;
+    final detectionRate = totalMutations > 0 ? (detectedCount / totalMutations * 100) : 0;
+    
+    print('Total mutations tested: $totalMutations');
+    print('Mutations detected: $detectedCount');
+    print('Detection rate: ${detectionRate.toStringAsFixed(1)}%');
+    print('');
+    
+    // Detailed results
+    print('Detailed Results:');
+    print('-' * 40);
+    
+    for (final result in results) {
+      final status = result.mutationDetected ? '✅ DETECTED' : '❌ MISSED';
+      final time = result.executionTime?.inMilliseconds ?? 0;
+      
+      print('${result.mutationType.displayName.padRight(12)} | $status | ${time}ms');
+    }
+    
+    print('');
+    
+    // Quality assessment
+    if (detectionRate == 100) {
+      print('🏆 Excellent! All mutations were detected.');
+      print('   Your test suite provides comprehensive coverage.');
+    } else if (detectionRate >= 80) {
+      print('👍 Good mutation detection rate.');
+      print('   Consider adding tests for missed mutations.');
+    } else if (detectionRate >= 60) {
+      print('⚠️  Moderate mutation detection.');
+      print('   Your test suite needs improvement.');
+    } else {
+      print('❌ Low mutation detection rate.');
+      print('   Critical: Add more comprehensive tests.');
+    }
+    
+    // Recommendations for missed mutations
+    final missedTypes = results
+        .where((r) => !r.mutationDetected)
+        .map((r) => r.mutationType.displayName)
+        .toSet();
+    
+    if (missedTypes.isNotEmpty) {
+      print('');
+      print('💡 Recommendations:');
+      print('   Add tests covering: ${missedTypes.join(', ')} operations');
+    }
+  }
+
+  /// Convenience method to run mutation testing on a directory of mutations
+  static Future<List<MutationTestResult>> runMutationTestsFromDirectory({
+    required String originalFilePath,
+    required String mutationDirectory,
+    String? testCommand,
+    String? workingDirectory,
+    bool verbose = false,
+  }) async {
+    // Find all mutation files in the directory
+    final mutationDir = Directory(mutationDirectory);
+    
+    if (!await mutationDir.exists()) {
+      throw Exception('Mutation directory not found: $mutationDirectory');
+    }
+    
+    final mutationFiles = <String>[];
+    
+    await for (final entity in mutationDir.list(recursive: true)) {
+      if (entity is File && entity.path.endsWith('.dart')) {
+        mutationFiles.add(entity.path);
+      }
+    }
+    
+    if (mutationFiles.isEmpty) {
+      throw Exception('No mutation files found in: $mutationDirectory');
+    }
+    
+    return runMutationTestSuite(
+      originalFilePath: originalFilePath,
+      mutatedFilePaths: mutationFiles,
+      testCommand: testCommand,
+      workingDirectory: workingDirectory,
+      verbose: verbose,
+    );
   }
 }

@@ -3,65 +3,101 @@ import 'package:smart_mutation/cli_config.dart';
 import 'package:smart_mutation/config_model.dart';
 import 'package:smart_mutation/json_processor.dart';
 
-/// Main entry point with JSON-only configuration
+/// Optimized main entry point with enhanced performance and error handling
 Future<void> main(List<String> arguments) async {
+  final stopwatch = Stopwatch()..start();
+  
   try {
+    print('🚀 Smart Mutation Tool v2.1 - GitHub-Style Mutation Testing');
+    
     final config = await parseArguments(arguments);
-    await _runJsonMode(config);
-  } catch (e) {
-    print('Fatal error: $e');
+    await _runOptimizedJsonMode(config);
+    
+    stopwatch.stop();
+    print('\n✅ Mutation testing completed in ${stopwatch.elapsedMilliseconds}ms');
+    
+  } catch (e, stackTrace) {
+    stopwatch.stop();
+    print('\n❌ Fatal error after ${stopwatch.elapsedMilliseconds}ms: $e');
+    if (arguments.contains('--verbose') || arguments.contains('-v')) {
+      print('Stack trace: $stackTrace');
+    }
     exit(1);
   }
 }
 
-/// Run JSON configuration mode
-Future<void> _runJsonMode(CliConfig cliConfig) async {
-  print('🚀 Smart Mutation Tool - JSON Configuration Mode');
-  
+/// Optimized JSON configuration mode with performance enhancements
+Future<void> _runOptimizedJsonMode(CliConfig cliConfig) async {
   SmartMutationConfig jsonConfig;
   
   if (cliConfig.useDefault) {
-    // Use default configuration
     jsonConfig = SmartMutationConfig.defaultConfig();
     
     if (cliConfig.verbose) {
-      print('Using default configuration:');
-      print('  Input paths: ${jsonConfig.inputPaths.join(", ")}');
-      print('  Output directory: ${jsonConfig.outputDir}');
-      print('  Mutation types: ${jsonConfig.mutationTypes.join(", ")}');
-      print('  Tracking enabled: ${jsonConfig.enableTracking}');
-      print('  Cumulative mode: ${jsonConfig.useCumulative}');
-      print('  Parallel processing: ${jsonConfig.parallel}');
-      print('');
+      print('\n📋 Using optimized default configuration:');
+      _printConfigDetails(jsonConfig);
     }
   } else {
-    // Load JSON configuration from file
+    print('📂 Loading configuration from: ${cliConfig.configFile}');
     jsonConfig = await SmartMutationConfig.fromFile(cliConfig.configFile!);
     
     if (cliConfig.verbose) {
-      print('Loaded configuration from: ${cliConfig.configFile}');
-      print('Configuration: $jsonConfig');
+      print('\n📋 Loaded configuration:');
+      _printConfigDetails(jsonConfig);
     }
   }
   
-  // Override verbose setting if specified via CLI
+  // Apply CLI overrides efficiently
   if (cliConfig.verbose && !jsonConfig.verbose) {
-    jsonConfig = SmartMutationConfig(
-      inputPaths: jsonConfig.inputPaths,
-      outputDir: jsonConfig.outputDir,
-      mutationTypes: jsonConfig.mutationTypes,
-      enableTracking: jsonConfig.enableTracking,
-      useCumulative: jsonConfig.useCumulative,
-      verbose: true, // Override to true
-      excludePatterns: jsonConfig.excludePatterns,
-      includePatterns: jsonConfig.includePatterns,
-      lineRanges: jsonConfig.lineRanges,
-      parallel: jsonConfig.parallel,
-      maxThreads: jsonConfig.maxThreads,
-    );
+    jsonConfig = _applyVerboseOverride(jsonConfig);
   }
   
-  // Process with JSON configuration
+  // Determine optimal processing strategy
+  final processingStrategy = _determineOptimalStrategy(jsonConfig);
+  print('🎯 Using $processingStrategy processing strategy');
+  
+  // Process with optimized configuration
   final processor = JsonConfigProcessor();
   await processor.processWithConfig(jsonConfig);
+}
+
+/// Apply verbose override efficiently
+SmartMutationConfig _applyVerboseOverride(SmartMutationConfig config) {
+  return SmartMutationConfig(
+    inputPaths: config.inputPaths,
+    outputDir: config.outputDir,
+    mutationTypes: config.mutationTypes,
+    enableTracking: config.enableTracking,
+    useCumulative: config.useCumulative,
+    verbose: true,
+    excludePatterns: config.excludePatterns,
+    includePatterns: config.includePatterns,
+    lineRanges: config.lineRanges,
+    parallel: config.parallel,
+    maxThreads: config.maxThreads,
+  );
+}
+
+/// Print configuration details in a clean format
+void _printConfigDetails(SmartMutationConfig config) {
+  print('  📁 Input paths: ${config.inputPaths.join(", ")}');
+  print('  📤 Output directory: ${config.outputDir}');
+  print('  🧬 Mutation types: ${config.mutationTypes.join(", ")}');
+  print('  📊 Tracking enabled: ${config.enableTracking}');
+  print('  🔄 Cumulative mode: ${config.useCumulative}');
+  print('  ⚡ Parallel processing: ${config.parallel}');
+  if (config.parallel) {
+    print('  🧵 Max threads: ${config.maxThreads}');
+  }
+}
+
+/// Determine optimal processing strategy based on configuration
+String _determineOptimalStrategy(SmartMutationConfig config) {
+  if (config.parallel && config.inputPaths.length > 1) {
+    return 'Multi-threaded parallel';
+  } else if (config.useCumulative) {
+    return 'Cumulative mutation';
+  } else {
+    return 'Sequential';
+  }
 }

@@ -1,36 +1,14 @@
 {
-  "inputPaths": [
-    "lib/",
-    "bin/",
-    "test/"
-  ],
-  "outputDir": "mutations",
-  "mutationTypes": [
-    "arithmetic",
-    "logical",
-    "relational"
-  ],
+  "inputPaths": ["lib"],
+  "outputDir": "mutations_output",
+  "mutationTypes": ["arithmetic", "logical", "relational"],
   "enableTracking": true,
   "useCumulative": false,
-  "verbose": true,
-  "excludePatterns": [
-    "**/generated/**",
-    "**/*.g.dart",
-    "**/test/**"
-  ],
-  "includePatterns": [
-    "**/*.dart"
-  ],
-  "lineRanges": {
-    "lib/mutator.dart": {
-      "startLine": 1,
-      "endLine": 100
-    },
-    "bin/smart_mutation.dart": {
-      "startLine": 20,
-      "endLine": 50
-    }
-  },
-  "parallel": true,
-  "maxThreads": 4
+  "verbose": false,
+  "parallel": false,
+  "maxThreads": 2,
+  "excludePatterns": ["**/*_test.dart", "**/test/**"],
+  "includePatterns": ["**/*.dart"],
+  "lineRanges": {},
+  "reportFormat": "html"
 }

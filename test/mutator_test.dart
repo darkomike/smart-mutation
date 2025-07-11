@@ -29,16 +29,16 @@ void main() {
     });
 
     test('should validate line ranges correctly', () {
-      const code = 'line1\\nline2\\nline3';
+      const code = 'int a = 5 + 3;\\nint b = 10 - 2;\\nint c = 7 * 4;';
       
-      // Valid range
+      // Valid range - should return a mutation
       final result1 = mutator.performMutation(
         code, Mutator.getArithmeticRules(), 
         startLine: 1, endLine: 2
       );
       expect(result1, isNotNull);
       
-      // Invalid range - should use full code
+      // Invalid range - should still process full code
       final result2 = mutator.performMutation(
         code, Mutator.getArithmeticRules(),
         startLine: -1, endLine: 10
@@ -115,9 +115,10 @@ bool check(bool x) {
       final rules = Mutator.getArithmeticRules();
       final originalLength = rules.length;
       
-      // Attempting to modify should not affect the original
-      rules.clear();
+      // Attempting to modify should throw an error due to immutability
+      expect(() => rules.clear(), throwsUnsupportedError);
       
+      // Original rules should remain unchanged
       final newRules = Mutator.getArithmeticRules();
       expect(newRules.length, equals(originalLength));
     });

@@ -1,0 +1,34 @@
+{
+  "inputPaths": [
+    "lib/"
+  ],
+  "outputDir": "output",
+  "mutationTypes": [
+    "arithmetic",
+    "logical",
+    "relational",
+    "conditional",
+    "increment",
+    "assignment"
+  ],
+  "runTests": true,
+  "testCommand": "dart test example/test/test.dart",
+  "enableTracking": true,
+  "useCumulative": true,
+  "verbose": false,
+  "excludePatterns": [
+    "**/generated/**",
+    "**/*.g.dart"
+  ],
+  "includePatterns": [
+    "**/*.dart"
+  ],
+  "lineRanges": {
+    "lib/calculate.dart": {
+      "startLine": 1,
+      "endLine": 500
+    }
+  },
+  "parallel": true,
+  "maxThreads": 2
+}

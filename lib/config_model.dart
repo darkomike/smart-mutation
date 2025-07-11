@@ -16,6 +16,8 @@ class SmartMutationConfig {
     this.lineRanges = const {},
     this.parallel = true,
     this.maxThreads,
+    this.runTests = false,
+    this.testCommand,
   });
 
   final List<String> inputPaths;
@@ -29,6 +31,8 @@ class SmartMutationConfig {
   final Map<String, LineRange> lineRanges;
   final bool parallel;
   final int? maxThreads;
+  final bool runTests;
+  final String? testCommand;
 
   /// Create default configuration for quick start
   factory SmartMutationConfig.defaultConfig() {
@@ -65,6 +69,8 @@ class SmartMutationConfig {
       lineRanges: _parseLineRanges(json['lineRanges'] as Map<String, dynamic>? ?? {}),
       parallel: json['parallel'] as bool? ?? true,
       maxThreads: json['maxThreads'] as int?,
+      runTests: json['runTests'] as bool? ?? false,
+      testCommand: json['testCommand'] as String?,
     );
   }
 
@@ -82,6 +88,8 @@ class SmartMutationConfig {
       'lineRanges': _lineRangesToJson(),
       'parallel': parallel,
       if (maxThreads != null) 'maxThreads': maxThreads,
+      'runTests': runTests,
+      if (testCommand != null) 'testCommand': testCommand,
     };
   }
 
@@ -157,6 +165,15 @@ class SmartMutationConfig {
           break;
         case 'functioncall':
           types.add(MutationType.functionCall);
+          break;
+        case 'conditional':
+          types.add(MutationType.conditional);
+          break;
+        case 'increment':
+          types.add(MutationType.increment);
+          break;
+        case 'assignment':
+          types.add(MutationType.assignment);
           break;
         case 'all':
           return Mutator.getAllRules();
