@@ -1,3 +1,51 @@
 # https://dart.dev/guides/libraries/private-files
 # Created by `dart pub`
 .dart_tool/
+
+# Build outputs
+build/
+*.so
+*.dylib
+*.dll
+
+# Test outputs and temporary files
+test_output*/
+test_input*/
+*_mutated.dart
+coverage/
+doc/api/
+
+# IDE files
+.vscode/
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Backup and temporary files
+*_backup.*
+*_temp.*
+*.tmp
+*.bak
+*.swp
+*.swo
+
+# Log files
+*.log
+
+# Package manager
+pubspec.lock
+
+# Demo and test files (for development)
+demo_*.dart
+test_*.dart
+sample_*.dart

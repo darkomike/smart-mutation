@@ -1,16 +1,29 @@
 name: smart_mutation
-description: A sample command-line application.
-version: 1.0.0
-# repository: https://github.com/my_org/my_repo
+description: An advanced Dart mutation testing tool for comprehensive code quality analysis.
+version: 2.0.0
+homepage: https://github.com/darkomike/smart_mutation
+repository: https://github.com/darkomike/smart_mutation
+issue_tracker: https://github.com/darkomike/smart_mutation/issues
 
 environment:
-  sdk: ^3.5.4
+  sdk: '>=3.0.0 <4.0.0'
 
-# Add regular dependencies here.
 dependencies:
   args: ^2.7.0
-  path: ^1.8.0
+  path: ^1.9.0
+  meta: ^1.11.0
 
 dev_dependencies:
   lints: ^4.0.0
   test: ^1.24.0
+  coverage: ^1.7.0
+
+executables:
+  smart_mutation: smart_mutation
+
+topics:
+  - testing
+  - mutation-testing
+  - code-quality
+  - dart
+  - analysis
