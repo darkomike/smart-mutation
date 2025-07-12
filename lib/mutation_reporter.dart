@@ -261,42 +261,69 @@ class MutationTestReporter {
         
         .line-number {
             display: inline-block;
-            width: 40px;
+            width: 50px;
             text-align: right;
             margin-right: 16px;
             color: #656d76;
             user-select: none;
+            font-weight: 500;
         }
         
         .line-removed {
             background: #ffebe9;
+            border-left: 3px solid #cf222e;
+        }
+        
+        .line-removed .line-number {
+            color: #cf222e;
+            background: #ffd6d3;
+            padding: 0 4px;
+            margin-right: 12px;
         }
         
         .line-removed::before {
-            content: "-";
-            color: #cf222e;
-            font-weight: bold;
-            margin-right: 8px;
+            content: "";
         }
         
         .line-added {
             background: #e6ffed;
+            border-left: 3px solid #1a7f37;
+        }
+        
+        .line-added .line-number {
+            color: #1a7f37;
+            background: #ccf2d4;
+            padding: 0 4px;
+            margin-right: 12px;
         }
         
         .line-added::before {
-            content: "+";
-            color: #1a7f37;
-            font-weight: bold;
-            margin-right: 8px;
+            content: "";
         }
         
         .line-context {
             background: #ffffff;
         }
         
+        .line-context .line-number {
+            background: #f6f8fa;
+            padding: 0 4px;
+            margin-right: 12px;
+        }
+        
         .line-context::before {
-            content: " ";
-            margin-right: 8px;
+            content: "";
+        }
+        
+        .diff-summary {
+            padding: 8px 16px;
+            background: #f1f8ff;
+            border: 1px solid #0969da;
+            border-radius: 4px;
+            margin-top: 8px;
+            font-size: 12px;
+            color: #0969da;
+            font-style: italic;
         }
         
         .mutation-meta {
@@ -459,38 +486,122 @@ class MutationTestReporter {
       final originalLines = results[0];
       final mutatedLines = results[1];
       
-      return _createOptimizedGitHubDiff(originalLines, mutatedLines, 1);
+      // Check if this is a cumulative mutation file
+      final mutatedContent = await mutatedFileObj.readAsString();
+      final isCumulative = mutatedContent.contains('@ MUTATION:');
+      
+      if (isCumulative) {
+        // For cumulative files, show the complete diff with mutation highlights
+        return _createCumulativeDiff(originalLines, mutatedLines, result.mutationType);
+      } else {
+        // For individual mutations, show standard diff
+        return _createOptimizedGitHubDiff(originalLines, mutatedLines, 1);
+      }
     } catch (e) {
       return '<div class="diff-line">Error: ${_escapeHtml(e.toString())}</div>';
     }
   }
 
-  /// Create optimized GitHub-style diff HTML
-  static String _createOptimizedGitHubDiff(List<String> originalLines, List<String> mutatedLines, int mutationLine) {
+  /// Create optimized GitHub-style diff HTML with intelligent line comparison
+  static String _createOptimizedGitHubDiff(List<String> originalLines, List<String> mutatedLines, int hintLine) {
     final buffer = StringBuffer();
+    
+    // Find all lines that actually differ
+    final differences = <int>[];
+    final maxLength = math.max(originalLines.length, mutatedLines.length);
+    
+    for (int i = 0; i < maxLength; i++) {
+      final originalLine = i < originalLines.length ? originalLines[i] : '';
+      final mutatedLine = i < mutatedLines.length ? mutatedLines[i] : '';
+      
+      if (originalLine != mutatedLine) {
+        differences.add(i);
+      }
+    }
+    
+    if (differences.isEmpty) {
+      return '<div class="diff-line line-context">No differences found</div>';
+    }
+    
+    // Show context around the first difference
+    final firstDiff = differences.first;
     const contextLines = 3;
-    final startLine = math.max(0, mutationLine - contextLines - 1);
-    final endLine = math.min(originalLines.length, mutationLine + contextLines);
+    final startLine = math.max(0, firstDiff - contextLines);
+    final endLine = math.min(originalLines.length, firstDiff + contextLines + 1);
     
     for (int i = startLine; i < endLine; i++) {
       final displayLineNumber = i + 1;
+      final isOriginalAvailable = i < originalLines.length;
+      final isMutatedAvailable = i < mutatedLines.length;
       
-      if (i < originalLines.length && i < mutatedLines.length) {
+      if (isOriginalAvailable && isMutatedAvailable) {
         final originalLine = originalLines[i];
         final mutatedLine = mutatedLines[i];
         
-        if (i == mutationLine - 1 && originalLine != mutatedLine) {
-          // Show the mutation with optimized HTML
-          buffer.writeln('<div class="diff-line line-removed"><span class="line-number">$displayLineNumber</span>${_escapeHtml(originalLine)}</div>');
-          buffer.writeln('<div class="diff-line line-added"><span class="line-number">$displayLineNumber</span>${_escapeHtml(mutatedLine)}</div>');
+        if (differences.contains(i)) {
+          // Show the mutation with distinct colors
+          buffer.writeln('<div class="diff-line line-removed"><span class="line-number">-$displayLineNumber</span>${_escapeHtml(originalLine)}</div>');
+          buffer.writeln('<div class="diff-line line-added"><span class="line-number">+$displayLineNumber</span>${_escapeHtml(mutatedLine)}</div>');
         } else {
           // Context line
-          buffer.writeln('<div class="diff-line line-context"><span class="line-number">$displayLineNumber</span>${_escapeHtml(originalLine)}</div>');
+          buffer.writeln('<div class="diff-line line-context"><span class="line-number"> $displayLineNumber</span>${_escapeHtml(originalLine)}</div>');
+        }
+      } else if (isOriginalAvailable) {
+        // Line only in original (deleted)
+        buffer.writeln('<div class="diff-line line-removed"><span class="line-number">-$displayLineNumber</span>${_escapeHtml(originalLines[i])}</div>');
+      } else if (isMutatedAvailable) {
+        // Line only in mutated (added)
+        buffer.writeln('<div class="diff-line line-added"><span class="line-number">+$displayLineNumber</span>${_escapeHtml(mutatedLines[i])}</div>');
+      }
+    }
+    
+    // Add summary of changes
+    if (differences.length > 1) {
+      buffer.writeln('<div class="diff-summary">... ${differences.length} lines changed in total</div>');
+    }
+    
+    return buffer.toString();
+  }
+
+  /// Create diff view for cumulative mutations highlighting specific mutation type
+  static String _createCumulativeDiff(List<String> originalLines, List<String> mutatedLines, MutationType targetType) {
+    final diffLines = <String>[];
+    final maxLength = originalLines.length > mutatedLines.length 
+        ? originalLines.length 
+        : mutatedLines.length;
+    
+    for (var i = 0; i < maxLength; i++) {
+      final originalLine = i < originalLines.length ? originalLines[i] : '';
+      final mutatedLine = i < mutatedLines.length ? mutatedLines[i] : '';
+      final lineNumber = i + 1;
+      
+      if (originalLine != mutatedLine) {
+        // Check if this line contains the target mutation type
+        final containsTargetMutation = mutatedLine.contains('@ MUTATION: ${targetType.displayName}');
+        
+        if (containsTargetMutation) {
+          // Highlight this specific mutation
+          if (originalLine.isNotEmpty) {
+            diffLines.add('<div class="diff-line line-removed"><span class="line-number">$lineNumber</span>$originalLine</div>');
+          }
+          diffLines.add('<div class="diff-line line-added"><span class="line-number">$lineNumber</span>$mutatedLine</div>');
+        } else {
+          // Show other mutations as context
+          diffLines.add('<div class="diff-line line-context"><span class="line-number">$lineNumber</span>$mutatedLine</div>');
+        }
+      } else if (originalLine.isNotEmpty) {
+        // Show unchanged lines as context (limited)
+        if (diffLines.isNotEmpty && diffLines.length < 10) {
+          diffLines.add('<div class="diff-line line-context"><span class="line-number">$lineNumber</span>$originalLine</div>');
         }
       }
     }
     
-    return buffer.toString();
+    if (diffLines.isEmpty) {
+      return '<div class="diff-line">No changes detected for ${targetType.displayName} mutation</div>';
+    }
+    
+    return diffLines.join('\n');
   }
 
   /// Optimized HTML escaping

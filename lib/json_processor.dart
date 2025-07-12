@@ -74,6 +74,9 @@ class JsonConfigProcessor {
     // Run mutation tests if configured
     if (config.runTests && results.outputFiles.isNotEmpty) {
       await _runMutationTests(results, config);
+    } else if (results.outputFiles.isNotEmpty) {
+      // Generate reports even without running tests
+      await _generateStandaloneReport(results, config);
     }
     
     // Print comprehensive summary
@@ -278,7 +281,7 @@ class JsonConfigProcessor {
   ) async {
     final cumulativeOutputPath = '$basePath${'_mutated'}$fileExtension';
     
-    final cumulativeMutation = mutator.performCumulativeMutations(
+    final cumulativeResult = mutator.performCumulativeMutationsWithCount(
       code,
       config.mutationRules,
       startLine: lineRange?.startLine,
@@ -287,10 +290,10 @@ class JsonConfigProcessor {
       trackMutations: config.enableTracking,
     );
     
-    if (cumulativeMutation != null) {
-      print('  Generated cumulative mutation for ${path.basename(originalFile.path)}');
+    if (cumulativeResult != null) {
+      print('  Generated cumulative mutation for ${path.basename(originalFile.path)} (${cumulativeResult.mutationCount} mutations)');
       return FileProcessingResult(
-        mutationCount: 1, 
+        mutationCount: cumulativeResult.mutationCount, 
         outputPaths: [cumulativeOutputPath]
       );
     } else {
@@ -405,7 +408,30 @@ class JsonConfigProcessor {
         verbose: false,
       );
       
-      allTestResults.addAll(testResults);
+      // Expand cumulative results into individual mutation results
+      final expandedResults = <MutationTestResult>[];
+      for (final result in testResults) {
+        if (config.useCumulative && result.mutationFile != null) {
+          // For cumulative files, create separate results for each mutation
+          final mutationCount = _countMutationsInFile(result.mutationFile!);
+          final mutationTypes = _extractMutationTypesFromFile(result.mutationFile!);
+          
+          for (int i = 0; i < mutationCount; i++) {
+            final mutationType = i < mutationTypes.length ? mutationTypes[i] : MutationType.arithmetic;
+            expandedResults.add(MutationTestResult(
+              mutationType: mutationType,
+              testPassed: result.testPassed,
+              testOutput: result.testOutput,
+              mutationFile: result.mutationFile,
+              executionTime: result.executionTime,
+            ));
+          }
+        } else {
+          expandedResults.add(result);
+        }
+      }
+      
+      allTestResults.addAll(expandedResults);
     }
     
     // Print comprehensive test results summary
@@ -421,11 +447,14 @@ class JsonConfigProcessor {
       return;
     }
 
+    // Get the primary original file for the report
+    final primaryOriginalFile = _getPrimaryOriginalFile(results, config);
+
     // Generate comprehensive report
     final report = await MutationTestReporter.generateReport(
       results: results,
       mutatedFiles: results.map((r) => r.mutationFile ?? '').where((f) => f.isNotEmpty).toList(),
-      originalFile: config.inputPaths.first,
+      originalFile: primaryOriginalFile,
       includeDetailedAnalysis: true,
     );
 
@@ -437,7 +466,7 @@ class JsonConfigProcessor {
     await MutationTestReporter.generateReport(
       results: results,
       mutatedFiles: results.map((r) => r.mutationFile ?? '').where((f) => f.isNotEmpty).toList(),
-      originalFile: config.inputPaths.first,
+      originalFile: primaryOriginalFile,
       outputPath: htmlReportPath,
       includeDetailedAnalysis: true,
       format: 'html',
@@ -456,6 +485,111 @@ class JsonConfigProcessor {
         format: 'json',
       );
       print('📄 JSON report also saved to: $jsonReportPath');
+    }
+  }
+
+  /// Generate standalone HTML/JSON reports without running mutation tests
+  Future<void> _generateStandaloneReport(ProcessingResults results, SmartMutationConfig config) async {
+    if (results.outputFiles.isEmpty) {
+      print('\n📊 No mutations generated - skipping report generation.');
+      return;
+    }
+
+    print('\n📊 Generating mutation analysis report...');
+
+    // Create mock mutation test results for report generation
+    final mockResults = <MutationTestResult>[];
+    
+    for (final outputFile in results.outputFiles) {
+      if (config.useCumulative) {
+        // For cumulative files, create separate results for each mutation
+        final mutationCount = _countMutationsInFile(outputFile);
+        final mutationTypes = _extractMutationTypesFromFile(outputFile);
+        
+        for (int i = 0; i < mutationCount; i++) {
+          final mutationType = i < mutationTypes.length ? mutationTypes[i] : MutationType.arithmetic;
+          mockResults.add(MutationTestResult(
+            mutationType: mutationType,
+            testPassed: true, // Unknown without actual testing - assume no detection
+            testOutput: 'No tests run - mutation analysis only',
+            mutationFile: outputFile,
+            executionTime: Duration.zero,
+          ));
+        }
+      } else {
+        // For separate mutation files, create one result per file
+        mockResults.add(MutationTestResult(
+          mutationType: MutationType.arithmetic, // Default type
+          testPassed: true, // Unknown without actual testing - assume no detection
+          testOutput: 'No tests run - mutation analysis only',
+          mutationFile: outputFile,
+          executionTime: Duration.zero,
+        ));
+      }
+    }
+
+    // Find the actual original file path for the mutations
+    String originalFilePath = config.inputPaths.first;
+    
+    if (results.outputFiles.isNotEmpty) {
+      final outputFile = results.outputFiles.first;
+      final fileName = path.basenameWithoutExtension(outputFile);
+      
+      // Remove mutation suffixes to get original file name
+      final originalFileName = fileName
+          .replaceAll('_mutated', '')
+          .replaceAll('_cumulative', '');
+      
+      // Try to find the matching original file
+      for (final inputPath in config.inputPaths) {
+        if (inputPath == '.') {
+          // Search in current directory
+          final candidateFile = '$originalFileName.dart';
+          if (await File(candidateFile).exists()) {
+            originalFilePath = candidateFile;
+            break;
+          }
+        } else if (inputPath.contains(originalFileName)) {
+          originalFilePath = inputPath;
+          break;
+        }
+      }
+    }
+
+    // Print basic console report
+    print('\n📊 MUTATION ANALYSIS SUMMARY');
+    print('=' * 50);
+    print('Total mutations generated: ${results.totalMutations}');
+    print('Files processed: ${results.filesProcessed}');
+    print('Output files created: ${results.outputFiles.length}');
+    if (results.skippedFiles.isNotEmpty) {
+      print('Files skipped: ${results.skippedFiles.length}');
+    }
+
+    // Generate comprehensive report for HTML file (primary format)
+    final htmlReportPath = '${config.outputDir}/mutation_analysis_report.html';
+    await MutationTestReporter.generateReport(
+      results: mockResults,
+      mutatedFiles: results.outputFiles,
+      originalFile: originalFilePath,
+      outputPath: htmlReportPath,
+      includeDetailedAnalysis: true,
+      format: 'html',
+    );
+    print('\n🌐 HTML mutation analysis report saved to: $htmlReportPath');
+
+    // Also save JSON report if verbose mode
+    if (config.verbose) {
+      final jsonReportPath = '${config.outputDir}/mutation_analysis_report.json';
+      await MutationTestReporter.generateReport(
+        results: mockResults,
+        mutatedFiles: results.outputFiles,
+        originalFile: originalFilePath,
+        outputPath: jsonReportPath,
+        includeDetailedAnalysis: true,
+        format: 'json',
+      );
+      print('📄 JSON analysis report also saved to: $jsonReportPath');
     }
   }
 
@@ -494,6 +628,178 @@ class JsonConfigProcessor {
           print('  - $error');
         }
       }
+    }
+  }
+
+  /// Map mutated files back to their original source files
+  String _getOriginalFileForMutation(String mutatedFilePath, SmartMutationConfig config) {
+    // Extract base filename from mutated file
+    final basename = path.basenameWithoutExtension(mutatedFilePath);
+    
+    // Remove mutation suffixes to get original name (order matters!)
+    String originalName = basename
+        .replaceAll('_arithmetic_mutated', '')
+        .replaceAll('_logical_mutated', '')
+        .replaceAll('_relational_mutated', '')
+        .replaceAll('_datatype_mutated', '')
+        .replaceAll('_functionCall_mutated', '')
+        .replaceAll('_mutated', ''); // General fallback
+    
+    // Search for the original file in input paths
+    for (final inputPath in config.inputPaths) {
+      final entity = FileSystemEntity.typeSync(inputPath);
+      
+      if (entity == FileSystemEntityType.file && inputPath.endsWith('$originalName.dart')) {
+        return inputPath;
+      } else if (entity == FileSystemEntityType.directory) {
+        final originalFile = path.join(inputPath, '$originalName.dart');
+        if (File(originalFile).existsSync()) {
+          return originalFile;
+        }
+      }
+    }
+    
+    // Enhanced fallback: try to find any file with the base name
+    for (final inputPath in config.inputPaths) {
+      if (FileSystemEntity.typeSync(inputPath) == FileSystemEntityType.directory) {
+        final dir = Directory(inputPath);
+        try {
+          final files = dir.listSync().whereType<File>();
+          for (final file in files) {
+            final fileName = path.basenameWithoutExtension(file.path);
+            if (fileName == originalName) {
+              return file.path;
+            }
+          }
+        } catch (e) {
+          // Continue to next input path
+        }
+      }
+    }
+    
+    // Final fallback: return the first input path if it's a file, or construct path
+    if (config.inputPaths.isNotEmpty) {
+      final firstPath = config.inputPaths.first;
+      if (FileSystemEntity.typeSync(firstPath) == FileSystemEntityType.file) {
+        return firstPath;
+      } else {
+        return path.join(firstPath, '$originalName.dart');
+      }
+    }
+    
+    return mutatedFilePath; // Last resort
+  }
+
+  /// Get the primary original file for report generation
+  String _getPrimaryOriginalFile(List<MutationTestResult> results, SmartMutationConfig config) {
+    // Try to find the most relevant original file
+    for (final result in results) {
+      if (result.mutationFile != null) {
+        final originalFile = _getOriginalFileForMutation(result.mutationFile!, config);
+        if (File(originalFile).existsSync()) {
+          return originalFile;
+        }
+      }
+    }
+    
+    // Fallback to first valid file in input paths
+    for (final inputPath in config.inputPaths) {
+      if (File(inputPath).existsSync()) {
+        return inputPath;
+      }
+    }
+    
+    return config.inputPaths.first;
+  }
+
+  /// Count mutations in a cumulative file by analyzing mutation comments
+  int _countMutationsInFile(String filePath) {
+    try {
+      final content = File(filePath).readAsStringSync();
+      final mutationComments = RegExp(r'//\s*@\s*MUTATION:\s*\w+').allMatches(content);
+      return mutationComments.length;
+    } catch (e) {
+      return 1; // Fallback to 1 if unable to count
+    }
+  }
+
+  /// Extract mutation types from a cumulative file
+  List<MutationType> _extractMutationTypesFromFile(String filePath) {
+    try {
+      final content = File(filePath).readAsStringSync();
+      final mutationTypes = <MutationType>[];
+      final mutationComments = RegExp(r'//\s*@\s*MUTATION:\s*(\w+)').allMatches(content);
+      
+      for (final match in mutationComments) {
+        final typeName = match.group(1)?.toLowerCase();
+        switch (typeName) {
+          case 'arithmetic':
+            mutationTypes.add(MutationType.arithmetic);
+            break;
+          case 'logical':
+            mutationTypes.add(MutationType.logical);
+            break;
+          case 'relational':
+            mutationTypes.add(MutationType.relational);
+            break;
+          case 'datatype':
+            mutationTypes.add(MutationType.datatype);
+            break;
+          case 'functioncall':
+            mutationTypes.add(MutationType.functionCall);
+            break;
+          case 'increment':
+            mutationTypes.add(MutationType.arithmetic); // Treat increment as arithmetic
+            break;
+          default:
+            mutationTypes.add(MutationType.arithmetic); // Default fallback
+        }
+      }
+      
+      return mutationTypes.isNotEmpty ? mutationTypes : [MutationType.arithmetic];
+    } catch (e) {
+      return [MutationType.arithmetic]; // Fallback
+    }
+  }
+
+  /// Generate comprehensive mutation reports with proper file mappings
+  Future<void> _generateComprehensiveReports(ProcessingResults results, SmartMutationConfig config) async {
+    print('\n📊 Generating comprehensive mutation reports...');
+
+    for (final outputFile in results.outputFiles) {
+      final originalFile = _getOriginalFileForMutation(outputFile, config);
+      
+      // Generate detailed report for each mutated file
+      await MutationTestReporter.generateReport(
+        results: [MutationTestResult(
+          mutationType: MutationType.arithmetic, // Default type
+          testPassed: true, // Unknown without actual testing - assume no detection
+          testOutput: 'No tests run - mutation analysis only',
+          mutationFile: outputFile,
+          executionTime: Duration.zero,
+        )],
+        mutatedFiles: [outputFile],
+        originalFile: originalFile,
+        includeDetailedAnalysis: true,
+      );
+      
+      // Save report as HTML file
+      final htmlReportPath = '${config.outputDir}/mutation_report_${path.basenameWithoutExtension(outputFile)}.html';
+      await MutationTestReporter.generateReport(
+        results: [MutationTestResult(
+          mutationType: MutationType.arithmetic, // Default type
+          testPassed: true, // Unknown without actual testing - assume no detection
+          testOutput: 'No tests run - mutation analysis only',
+          mutationFile: outputFile,
+          executionTime: Duration.zero,
+        )],
+        mutatedFiles: [outputFile],
+        originalFile: originalFile,
+        outputPath: htmlReportPath,
+        includeDetailedAnalysis: true,
+        format: 'html',
+      );
+      print('  - HTML report saved to: $htmlReportPath');
     }
   }
 }

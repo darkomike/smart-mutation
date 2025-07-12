@@ -95,6 +95,19 @@ class MutationConfig {
   final bool verbose;
 }
 
+/// Result of cumulative mutation operations
+class CumulativeMutationResult {
+  const CumulativeMutationResult({
+    required this.mutatedCode,
+    required this.mutationCount,
+    required this.mutationTypes,
+  });
+
+  final String mutatedCode;
+  final int mutationCount;
+  final List<MutationType> mutationTypes;
+}
+
 /// Main mutator class with optimized performance and better error handling
 class Mutator {
   /// Cache for compiled regex patterns to improve performance
@@ -248,6 +261,79 @@ class Mutator {
         }
       }
       return currentCode;
+    }
+    
+    return null;
+  }
+
+  /// Optimized cumulative mutations with detailed tracking
+  CumulativeMutationResult? performCumulativeMutationsWithCount(
+    String sourceCode,
+    List<MutationRule> mutationRules, {
+    int? startLine,
+    int? endLine,
+    String? outputFilePath,
+    bool trackMutations = false,
+  }) {
+    if (sourceCode.isEmpty || mutationRules.isEmpty) return null;
+
+    var currentCode = sourceCode;
+    final lineToMutations = <int, Set<MutationType>>{};
+    final appliedMutationTypes = <MutationType>[];
+    
+    // Group rules by type for efficiency
+    final rulesByType = <MutationType, List<MutationRule>>{};
+    for (final rule in mutationRules) {
+      rulesByType.putIfAbsent(rule.type, () => []).add(rule);
+    }
+    
+    // Apply mutations cumulatively with tracking
+    for (final entry in rulesByType.entries) {
+      final type = entry.key;
+      final rulesForType = entry.value;
+      final beforeMutation = currentCode;
+      
+      final mutatedCode = performMutation(
+        currentCode, 
+        rulesForType,
+        startLine: startLine,
+        endLine: endLine,
+      );
+      
+      if (mutatedCode != null) {
+        // Track affected lines efficiently
+        _trackAffectedLines(beforeMutation, mutatedCode, type, lineToMutations);
+        appliedMutationTypes.add(type);
+        currentCode = mutatedCode;
+      }
+    }
+    
+    // Add tracking comments if requested and mutations were applied
+    if (trackMutations && lineToMutations.isNotEmpty) {
+      currentCode = _addSpecificTrackingComments(currentCode, lineToMutations);
+    }
+    
+    // Write output file if mutations were applied
+    if (lineToMutations.isNotEmpty) {
+      if (outputFilePath != null) {
+        try {
+          File(outputFilePath).writeAsStringSync(currentCode);
+        } catch (e) {
+          print('Warning: Failed to write cumulative result to $outputFilePath: $e');
+        }
+      }
+      
+      // Count total mutations by counting mutation comments in the final code
+      final mutationCommentCount = '@ MUTATION:'.allMatches(currentCode).length;
+      final totalMutations = mutationCommentCount > 0 ? mutationCommentCount : lineToMutations.values
+          .map((mutations) => mutations.length)
+          .fold(0, (sum, count) => sum + count);
+    
+      return CumulativeMutationResult(
+        mutatedCode: currentCode,
+        mutationCount: totalMutations,
+        mutationTypes: appliedMutationTypes,
+      );
     }
     
     return null;

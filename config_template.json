@@ -1,14 +1,92 @@
 {
-  "inputPaths": ["lib"],
-  "outputDir": "mutations_output",
-  "mutationTypes": ["arithmetic", "logical", "relational"],
+  "_comment": "Smart Mutation Tool v2.1 - Configuration Template",
+  "_docs": "See README.md, QUICK_START.md and CONFIG_GUIDE.md for comprehensive documentation",
+  "_field_explanations": {
+    "inputPaths": "Array of file/directory paths to analyze. Supports glob patterns like ['lib/**/*.dart', 'bin/**/*.dart']",
+    "outputDir": "Directory where reports and mutated files will be saved. Created if it doesn't exist.",
+    "mutationTypes": "Types of mutations to apply: arithmetic (+,-,*,/,%), logical (&&,||,!), relational (==,!=,>,<,>=,<=), datatype (int,double,String,bool,List,Set,Map), increment (++,--), functionCall (print,add,length,toString)",
+    "enableTracking": "Add '@ MUTATION: type' comments to mutated code for tracking. Set false for cleaner output.",
+    "useCumulative": "true=Apply ALL mutations to single files (recommended), false=Create separate files per mutation type",
+    "runTests": "false=Quick analysis only, true=Run tests and analyze mutation detection rates",
+    "testCommand": "Command to execute tests (required if runTests=true). Examples: 'dart test', 'flutter test'",
+    "verbose": "CONTROLS JSON GENERATION: false=Clean output with HTML only (production), true=Detailed output with JSON reports (debug). JSON files ONLY generated when verbose=true",
+    "parallel": "false=Single-threaded (safer), true=Multi-threaded (faster). Enable for large codebases.",
+    "maxThreads": "Maximum parallel threads if parallel=true. Recommended: 2-4 for most systems.",
+    "excludePatterns": "Glob patterns for files to exclude. Prevents mutation of test files and generated code.",
+    "includePatterns": "Glob patterns for files to include. Usually just ['**/*.dart'] for all Dart files.",
+    "lineRanges": "Apply mutations to specific line ranges: {'file_path': {'start': 10, 'end': 50}}. Leave {} for entire files.",
+    "reportFormat": "Report output format. Currently only 'html' supported (GitHub-style reports with diff visualization)."
+  },
+
+  
+  "inputPaths": [
+    "lib"
+  ],
+  
+  "outputDir": "output",
+  
+  "mutationTypes": [
+    "arithmetic",
+    "logical", 
+    "relational",
+    "datatype",
+    "increment",
+    "functionCall"
+  ],
+  
   "enableTracking": true,
   "useCumulative": true,
+  
+  "runTests": false,
+  "testCommand": "dart test",
+  
   "verbose": false,
+  
   "parallel": false,
   "maxThreads": 2,
-  "excludePatterns": ["**/*_test.dart", "**/test/**"],
-  "includePatterns": ["**/*.dart"],
+  
+  "excludePatterns": [
+    "**/*_test.dart",
+    "**/test/**",
+    "**/*.g.dart",
+    "**/generated/**"
+  ],
+  
+  "includePatterns": [
+    "**/*.dart"
+  ],
+  
   "lineRanges": {},
-  "reportFormat": "html"
+  
+  "reportFormat": "html",
+  
+  "_usage_examples": {
+    "production_mode": {
+      "description": "Full testing with coverage analysis",
+      "changes": {
+        "runTests": true,
+        "verbose": false,
+        "parallel": true,
+        "maxThreads": 4
+      }
+    },
+    "analysis_mode": {
+      "description": "Quick mutation analysis only", 
+      "changes": {
+        "runTests": false,
+        "verbose": false,
+        "parallel": false
+      }
+    },
+    "debug_mode": {
+      "description": "Detailed output with JSON reports",
+      "changes": {
+        "runTests": false,
+        "verbose": true,
+        "parallel": false
+      }
+    }
+  }
 }
+
+
