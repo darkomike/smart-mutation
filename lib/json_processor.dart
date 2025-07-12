@@ -247,6 +247,18 @@ class JsonConfigProcessor {
     final code = await dartFile.readAsString();
     final relativePath = path.relative(dartFile.path);
     
+    // Check line count limitation (reject files > 500 lines)
+    final lineCount = code.split('\n').length;
+    if (lineCount > 500) {
+      print('  ❌ SKIPPED: ${relativePath}');
+      print('     Reason: File too large (${lineCount} lines > 500 line limit)');
+      print('     Tip: Consider breaking large files into smaller modules for better mutation testing');
+      return FileProcessingResult(
+        mutationCount: 0,
+        outputPaths: [],
+      );
+    }
+    
     // Check if file has specific line range configuration
     final lineRange = config.lineRanges[relativePath] ?? 
                      config.lineRanges[dartFile.absolute.path];
@@ -281,24 +293,36 @@ class JsonConfigProcessor {
   ) async {
     final cumulativeOutputPath = '$basePath${'_mutated'}$fileExtension';
     
-    final cumulativeResult = mutator.performCumulativeMutationsWithCount(
+    // Use the new LLM-capable mutation method
+    final mutatedCode = await mutator.performMutationWithEngine(
       code,
-      config.mutationRules,
+      config.mutationTypes,
+      engine: config.mutationEngine,
+      llmConfig: config.effectiveLLMConfig,
+      filePath: originalFile.path,
       startLine: lineRange?.startLine,
       endLine: lineRange?.endLine,
-      outputFilePath: cumulativeOutputPath,
       trackMutations: config.enableTracking,
     );
     
-    if (cumulativeResult != null) {
-      print('  Generated cumulative mutation for ${path.basename(originalFile.path)} (${cumulativeResult.mutationCount} mutations)');
+    if (mutatedCode != null && mutatedCode != code) {
+      // Write the mutated code
+      final outputFile = File(cumulativeOutputPath);
+      await outputFile.writeAsString(mutatedCode);
+      
+      // Count mutations by counting @ MUTATION: comments
+      final mutationCount = _countMutationComments(mutatedCode);
+      
+      print('  Generated ${config.mutationEngine.name} mutation for ${path.basename(originalFile.path)} ($mutationCount mutations)');
       return FileProcessingResult(
-        mutationCount: cumulativeResult.mutationCount, 
+        mutationCount: mutationCount, 
         outputPaths: [cumulativeOutputPath]
       );
     } else {
       if (config.verbose) {
-        print('  No mutations found to apply in ${path.basename(originalFile.path)}');
+        print('  ⚠️  NO MUTATIONS: ${path.basename(originalFile.path)}');
+        print('     Reason: No applicable code patterns found for cumulative mutation');
+        print('     Tip: Ensure file contains functions, operators, or conditional logic');
       }
       return const FileProcessingResult(mutationCount: 0, outputPaths: []);
     }
@@ -338,7 +362,9 @@ class JsonConfigProcessor {
       );
     } else {
       if (config.verbose) {
-        print('  No mutations found to apply in ${path.basename(originalFile.path)}');
+        print('  ⚠️  NO MUTATIONS: ${path.basename(originalFile.path)}');
+        print('     Reason: No applicable code patterns found for individual mutations');
+        print('     Tip: Ensure file contains functions, operators, or conditional logic');
       }
       return const FileProcessingResult(mutationCount: 0, outputPaths: []);
     }
@@ -615,10 +641,11 @@ class JsonConfigProcessor {
     }
     
     if (results.skippedFiles.isNotEmpty && config.verbose) {
-      print('\nSkipped files (no mutations found):');
+      print('\n📋 Files Skipped:');
       for (final skippedFile in results.skippedFiles) {
         print('  - ${path.relative(skippedFile)}');
       }
+      print('     (See individual skip reasons above for details)');
     }
     
     if (results.errors.isNotEmpty) {
@@ -801,6 +828,12 @@ class JsonConfigProcessor {
       );
       print('  - HTML report saved to: $htmlReportPath');
     }
+  }
+
+  /// Count mutation comments in code
+  int _countMutationComments(String code) {
+    final mutationCommentRegex = RegExp(r'// @ MUTATION:', multiLine: true);
+    return mutationCommentRegex.allMatches(code).length;
   }
 }
 

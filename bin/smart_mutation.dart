@@ -75,6 +75,10 @@ SmartMutationConfig _applyVerboseOverride(SmartMutationConfig config) {
     lineRanges: config.lineRanges,
     parallel: config.parallel,
     maxThreads: config.maxThreads,
+    runTests: config.runTests,
+    testCommand: config.testCommand,
+    mutationEngine: config.mutationEngine,
+    llmConfig: config.llmConfig,
   );
 }
 

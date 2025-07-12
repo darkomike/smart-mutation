@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'dart:convert';
 import 'dart:async';
+import 'package:smart_mutation/config_model.dart';
+import 'package:smart_mutation/llm_mutator.dart';
 
 /// Enum to define different types of mutations
 enum MutationType {
@@ -116,6 +118,93 @@ class Mutator {
   /// Thread-safe regex compilation with caching
   static RegExp _getRegex(String pattern) {
     return _regexCache.putIfAbsent(pattern, () => RegExp(pattern));
+  }
+
+  /// Perform mutation using specified engine (rule-based, LLM, or hybrid)
+  Future<String?> performMutationWithEngine(
+    String sourceCode,
+    List<String> mutationTypes, {
+    MutationEngine engine = MutationEngine.ruleBased,
+    LLMConfig? llmConfig,
+    String? filePath,
+    int? startLine,
+    int? endLine,
+    bool trackMutations = false,
+  }) async {
+    if (sourceCode.isEmpty || mutationTypes.isEmpty) return null;
+
+    try {
+      switch (engine) {
+        case MutationEngine.llm:
+          final effectiveConfig = llmConfig ?? LLMConfig.defaultLocal;
+          final llmMutator = LLMMutator(effectiveConfig);
+          return await llmMutator.generateMutations(sourceCode, mutationTypes, filePath: filePath, startLine: startLine, endLine: endLine);
+
+        case MutationEngine.hybrid:
+          final effectiveConfig = llmConfig ?? LLMConfig.defaultLocal;
+          final llmMutator = LLMMutator(effectiveConfig);
+          return await llmMutator.generateHybridMutations(
+            sourceCode, 
+            mutationTypes, 
+            (code, types) => _performRuleBasedMutation(code, types, startLine: startLine, endLine: endLine, trackMutations: trackMutations),
+            filePath: filePath,
+          );
+
+        case MutationEngine.ruleBased:
+        default:
+          return _performRuleBasedMutation(sourceCode, mutationTypes, startLine: startLine, endLine: endLine, trackMutations: trackMutations);
+      }
+    } catch (e) {
+      print('❌ Mutation failed: $e');
+      print('🔄 Falling back to rule-based mutations');
+      return _performRuleBasedMutation(sourceCode, mutationTypes, startLine: startLine, endLine: endLine);
+    }
+  }
+
+  /// Internal rule-based mutation implementation
+  String _performRuleBasedMutation(
+    String sourceCode,
+    List<String> mutationTypes, {
+    int? startLine,
+    int? endLine,
+    bool trackMutations = false,
+  }) {
+    final rules = _getMutationRulesForTypes(mutationTypes);
+    if (trackMutations) {
+      return performMutationWithTracking(sourceCode, rules, startLine: startLine, endLine: endLine) ?? sourceCode;
+    } else {
+      return performMutation(sourceCode, rules, startLine: startLine, endLine: endLine) ?? sourceCode;
+    }
+  }
+
+  /// Get mutation rules for specified types
+  List<MutationRule> _getMutationRulesForTypes(List<String> mutationTypes) {
+    final allRules = <MutationRule>[];
+    
+    for (final type in mutationTypes) {
+      switch (type.toLowerCase()) {
+        case 'arithmetic':
+          allRules.addAll(getArithmeticRules());
+          break;
+        case 'logical':
+          allRules.addAll(getLogicalRules());
+          break;
+        case 'relational':
+          allRules.addAll(getRelationalRules());
+          break;
+        case 'datatype':
+          allRules.addAll(getDatatypeRules());
+          break;
+        case 'increment':
+          allRules.addAll(getIncrementRules());
+          break;
+        case 'functioncall':
+          allRules.addAll(getFunctionCallRules());
+          break;
+      }
+    }
+    
+    return allRules;
   }
 
   /// Legacy mutate method - maintained for backward compatibility

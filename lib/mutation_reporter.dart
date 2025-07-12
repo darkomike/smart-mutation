@@ -106,8 +106,9 @@ class MutationTestReporter {
     </div>
     
     <script>
-        // Lazy load diff content for better performance
+        // Enhanced JavaScript for compact table view
         document.addEventListener('DOMContentLoaded', function() {
+            // Legacy support for old cards
             const cards = document.querySelectorAll('.mutation-card');
             cards.forEach(card => {
                 card.addEventListener('click', function() {
@@ -118,6 +119,44 @@ class MutationTestReporter {
                 });
             });
         });
+        
+        // Toggle diff view for table rows
+        function toggleDiff(mutationId) {
+            const diffRow = document.getElementById('diff-' + mutationId);
+            if (diffRow) {
+                const isVisible = diffRow.style.display !== 'none';
+                diffRow.style.display = isVisible ? 'none' : 'table-row';
+                
+                // Update button text
+                const btn = event.target;
+                btn.textContent = isVisible ? 'View Details' : 'Hide Details';
+            }
+        }
+        
+        // Filter mutations by status
+        function filterMutations(status) {
+            const rows = document.querySelectorAll('.mutation-row');
+            const filterButtons = document.querySelectorAll('.filter-btn');
+            
+            // Update active button
+            filterButtons.forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Filter rows
+            rows.forEach(row => {
+                const rowStatus = row.getAttribute('data-status');
+                if (status === 'all' || rowStatus === status) {
+                    row.style.display = 'table-row';
+                } else {
+                    row.style.display = 'none';
+                    // Hide corresponding diff row
+                    const nextRow = row.nextElementSibling;
+                    if (nextRow && nextRow.classList.contains('diff-row')) {
+                        nextRow.style.display = 'none';
+                    }
+                }
+            });
+        }
     </script>
 </body>
 </html>''';
@@ -373,6 +412,155 @@ class MutationTestReporter {
                 transition-duration: 0.01ms !important;
             }
         }
+        
+        /* Compact Mutations Table Styles */
+        .mutations-summary {
+            background: #ffffff;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            overflow: hidden;
+            margin-bottom: 24px;
+        }
+        
+        .summary-header {
+            padding: 16px;
+            background: #f6f8fa;
+            border-bottom: 1px solid #d0d7de;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .summary-header h3 {
+            margin: 0;
+            color: #24292f;
+            font-size: 16px;
+        }
+        
+        .filter-buttons {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .filter-btn {
+            padding: 4px 12px;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            background: #ffffff;
+            color: #24292f;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s ease;
+        }
+        
+        .filter-btn:hover {
+            background: #f6f8fa;
+        }
+        
+        .filter-btn.active {
+            background: #0969da;
+            color: #ffffff;
+            border-color: #0969da;
+        }
+        
+        .mutations-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        
+        .mutations-table th,
+        .mutations-table td {
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid #d0d7de;
+        }
+        
+        .mutations-table th {
+            background: #f6f8fa;
+            font-weight: 600;
+            color: #24292f;
+        }
+        
+        .mutation-row:hover {
+            background: #f6f8fa;
+        }
+        
+        .mutation-row.detected {
+            background: rgba(26, 127, 55, 0.03);
+        }
+        
+        .mutation-row.missed {
+            background: rgba(207, 34, 46, 0.03);
+        }
+        
+        .mutation-id {
+            font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+            font-weight: 600;
+            color: #0969da;
+        }
+        
+        .type-badge {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .type-arithmetic { background: #fff5f5; color: #d73a49; }
+        .type-logical { background: #f0f8ff; color: #0366d6; }
+        .type-relational { background: #fffbdd; color: #735c0f; }
+        .type-datatype { background: #f0fff4; color: #28a745; }
+        .type-increment { background: #fff0f6; color: #d03592; }
+        .type-functioncall { background: #f5f0ff; color: #6f42c1; }
+        
+        .status-badge {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .time-cell, .file-cell {
+            font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+            font-size: 12px;
+            color: #656d76;
+        }
+        
+        .view-diff-btn {
+            padding: 4px 8px;
+            border: 1px solid #d0d7de;
+            border-radius: 4px;
+            background: #ffffff;
+            color: #24292f;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s ease;
+        }
+        
+        .view-diff-btn:hover {
+            background: #f6f8fa;
+            border-color: #8c959f;
+        }
+        
+        .diff-row {
+            display: none;
+        }
+        
+        .diff-row.show {
+            display: table-row;
+        }
+        
+        .diff-row td {
+            padding: 0;
+            background: #f6f8fa;
+        }
+        
+        .diff-row .diff-content {
+            padding: 16px;
+            border-top: 1px solid #d0d7de;
+        }
     </style>''';
   }
 
@@ -427,42 +615,79 @@ class MutationTestReporter {
         </div>''';
   }
 
-  /// Generate optimized mutation cards with better performance
+  /// Generate optimized mutation cards with compact table view
   static Future<String> _generateOptimizedMutationCards(List<MutationTestResult> results, String originalFile) async {
+    if (results.isEmpty) return '<p>No mutations found.</p>';
+    
     final buffer = StringBuffer();
     
-    // Process cards in batches for better memory management
-    const batchSize = 50;
-    for (int i = 0; i < results.length; i += batchSize) {
-      final end = math.min(i + batchSize, results.length);
-      final batch = results.sublist(i, end);
-      
-      for (int j = 0; j < batch.length; j++) {
-        final result = batch[j];
-        final cardIndex = i + j + 1;
-        final diffContent = await _generateOptimizedDiffView(result, originalFile);
-        
-        buffer.write('''
-        <div class="mutation-card">
-            <div class="mutation-header">
-                <div class="mutation-title">
-                    ${result.mutationType.displayName.toUpperCase()} mutation #$cardIndex
+    // Create a compact summary table instead of individual cards
+    buffer.writeln('''
+        <div class="mutations-summary">
+            <div class="summary-header">
+                <h3>📊 Mutations Summary (${results.length} total)</h3>
+                <div class="filter-buttons">
+                    <button onclick="filterMutations('all')" class="filter-btn active">All</button>
+                    <button onclick="filterMutations('detected')" class="filter-btn">Detected</button>
+                    <button onclick="filterMutations('missed')" class="filter-btn">Missed</button>
                 </div>
-                <span class="status-badge ${result.mutationDetected ? 'status-detected' : 'status-missed'}">
-                    ${result.mutationDetected ? '✅ Detected' : '❌ Missed'}
-                </span>
             </div>
-            <div class="diff-content">
-                $diffContent
-            </div>
-            <div class="mutation-meta">
-                <strong>Execution:</strong> ${result.executionTime?.inMilliseconds ?? 0}ms • 
-                <strong>File:</strong> ${_escapeHtml(result.mutationFile ?? 'N/A')}
-            </div>
-        </div>
+            <table class="mutations-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Time</th>
+                        <th>File</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+    ''');
+    
+    // Process mutations in compact rows
+    for (int i = 0; i < results.length; i++) {
+      final result = results[i];
+      final mutationType = result.mutationType.displayName.toUpperCase();
+      final mutationId = i + 1;
+      final timeMs = result.executionTime?.inMilliseconds ?? 0;
+      final fileName = result.mutationFile?.split('/').last ?? 'N/A';
+      
+      final statusClass = result.mutationDetected ? 'detected' : 'missed';
+      
+      buffer.writeln('''
+                    <tr class="mutation-row $statusClass" data-status="$statusClass">
+                        <td class="mutation-id">#$mutationId</td>
+                        <td class="mutation-type">
+                            <span class="type-badge type-${mutationType.toLowerCase()}">$mutationType</span>
+                        </td>
+                        <td class="status-cell">
+                            <span class="status-badge status-$statusClass">
+                                ${result.mutationDetected ? '✅ Detected' : '❌ Missed'}
+                            </span>
+                        </td>
+                        <td class="time-cell">${timeMs}ms</td>
+                        <td class="file-cell">$fileName</td>
+                        <td class="action-cell">
+                            <button class="view-diff-btn" onclick="toggleDiff($mutationId)">View Details</button>
+                        </td>
+                    </tr>
+                    <tr class="diff-row" id="diff-$mutationId" style="display: none;">
+                        <td colspan="6">
+                            <div class="diff-content">
+                                ${await _generateOptimizedDiffView(result, originalFile)}
+                            </div>
+                        </td>
+                    </tr>
       ''');
-      }
     }
+    
+    buffer.writeln('''
+                </tbody>
+            </table>
+        </div>
+    ''');
     
     return buffer.toString();
   }
@@ -470,16 +695,64 @@ class MutationTestReporter {
   /// Generate optimized diff view for better performance
   static Future<String> _generateOptimizedDiffView(MutationTestResult result, String originalFile) async {
     try {
-      final originalFileObj = File(originalFile);
+      // Derive the original file path from the mutated file path
+      String actualOriginalFile = originalFile;
+      
+      // If originalFile is a directory or the mutated file path contains it, derive the actual original file
+      if (result.mutationFile != null) {
+        final mutatedPath = result.mutationFile!;
+        
+        // Extract the original file path from the mutated file path
+        // e.g., "test_llm_output/config_model_mutated.dart" -> "lib/config_model.dart"
+        if (mutatedPath.contains('_mutated.dart')) {
+          final fileName = mutatedPath.split('/').last.replaceAll('_mutated.dart', '.dart');
+          if (originalFile.endsWith('.dart')) {
+            actualOriginalFile = originalFile;
+          } else {
+            // If originalFile is a directory like "lib", construct the full path
+            actualOriginalFile = originalFile.endsWith('/') ? '$originalFile$fileName' : '$originalFile/$fileName';
+          }
+        }
+      }
+      
+      final originalFileObj = File(actualOriginalFile);
       final mutatedFileObj = File(result.mutationFile ?? '');
       
       if (!await originalFileObj.exists() || !await mutatedFileObj.exists()) {
-        return '<div class="diff-line">Unable to generate diff - files not available</div>';
+        // Try alternative paths
+        if (!await originalFileObj.exists()) {
+          print('Debug: Original file not found at: $actualOriginalFile');
+          print('Debug: Trying to find original file for mutated: ${result.mutationFile}');
+          
+          // Try to find the original file in common locations
+          final mutatedFileName = result.mutationFile?.split('/').last.replaceAll('_mutated.dart', '.dart');
+          if (mutatedFileName != null) {
+            final possiblePaths = [
+              'lib/$mutatedFileName',
+              'bin/$mutatedFileName', 
+              'test/$mutatedFileName',
+              mutatedFileName,
+            ];
+            
+            for (final path in possiblePaths) {
+              final testFile = File(path);
+              if (await testFile.exists()) {
+                actualOriginalFile = path;
+                break;
+              }
+            }
+          }
+        }
+        
+        final finalOriginalFile = File(actualOriginalFile);
+        if (!await finalOriginalFile.exists() || !await mutatedFileObj.exists()) {
+          return '<div class="diff-line">Unable to generate diff - files not available</div>';
+        }
       }
       
       // Read files concurrently for better performance
       final results = await Future.wait([
-        originalFileObj.readAsLines(),
+        File(actualOriginalFile).readAsLines(),
         mutatedFileObj.readAsLines(),
       ]);
       

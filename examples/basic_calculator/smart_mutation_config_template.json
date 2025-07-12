@@ -30,5 +30,15 @@
     }
   },
   "parallel": true,
-  "maxThreads": 2
+  "maxThreads": 2,
+  "mutationEngine": "rule",
+  "llmConfig": {
+    "enabled": false,
+    "provider": "gemini",
+    "model": "1.5-flash-latest",
+    "apiKey": "YOUR_API_KEY_HERE",
+    "timeout": 30,
+    "temperature": 0.7,
+    "maxTokens": 4000
+  }
 }

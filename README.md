@@ -1,12 +1,20 @@
-# Smart Mutation Tool v2.1 - Advanced Dart Mutation Testing
+# Smart Mutation Tool v2.2 - Advanced Dart Mutation Testing
 
 [![Dart Version](https://img.shields.io/badge/Dart-3.0%2B-blue.svg)](https://dart.dev)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-v2.1-brightgreen.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/Version-v2.2-brightgreen.svg)](docs/CHANGELOG.md)
 
-🚀 **GitHub-Style Mutation Testing for Dart** - An enterprise-grade mutation testing tool featuring professional HTML reports with GitHub-style diff visualization, comprehensive test coverage analysis, and flexible JSON configuration system.
+🚀 **AI-Powered Mutation Testing for Dart** - An enterprise-grade mutation testing tool featuring **LLM-powered intelligent mutations**, professional HTML reports with GitHub-style diff visualization, comprehensive test coverage analysis, and flexible JSON configuration system.
 
 ## 🚀 Key Features
+
+### 🤖 AI-Powered Mutations (NEW!)
+
+- **LLM Integration**: Generate intelligent mutations using open-source LLMs
+- **Multi-Provider Support**: Ollama (local), OpenAI, Anthropic, HuggingFace, Custom APIs  
+- **Hybrid Mode**: LLM mutations with rule-based fallback for reliability
+- **Smart Mutations**: AI focuses on semantic bugs and edge cases traditional rules miss
+- **Configurable Prompts**: Customize mutation generation for your specific needs
 
 ### ⚡ Performance & Architecture
 
@@ -33,6 +41,7 @@
 - **Verbose Control**: JSON report generation controlled by verbose setting
 - **Pattern Matching**: Advanced glob patterns for precise file targeting
 - **Line Range Targeting**: Apply mutations to specific line ranges in files
+- **Engine Selection**: Choose between rule-based, LLM, or hybrid mutation engines
 
 ### 📊 Professional Reporting
 
@@ -64,6 +73,115 @@ dart bin/smart_mutation.dart --config config.json
 # Generate example configuration
 dart bin/smart_mutation.dart --generate-example
 ```
+
+> **🔒 Security Note**: Configuration files may contain API keys. The `smart_mutation_config.json` is automatically excluded from git commits. Always use template files for sharing configurations.
+
+### 🤖 AI-Powered Mutations with Ollama
+
+Transform your mutation testing with intelligent LLM-generated mutations using **Ollama** - local, private, and cost-free AI!
+
+#### ✨ Zero-Config LLM (NEW!)
+
+**AI mutations work out-of-the-box - no configuration required!**
+
+```json
+{
+  "inputPaths": ["lib/"],
+  "outputDir": "mutations",
+  "mutationTypes": ["arithmetic", "logical"],
+  "mutationEngine": "llm"    // That's it! Auto-configured with Ollama
+}
+```
+
+#### Quick Ollama Setup (One-Time)
+
+```bash
+# Install Ollama
+curl -fsSL https://ollama.com/install.sh | sh
+
+# Pull a code model (choose one)
+ollama pull codellama:7b      # 4GB - Best for mutations (default)
+ollama pull llama3:8b         # 4.7GB - Latest general model  
+ollama pull deepseek-coder:6.7b  # 3.8GB - Code specialist
+
+# Use AI mutations - zero config needed!
+dart bin/smart_mutation.dart your_config.json
+```
+
+#### Engine Options
+
+**Hybrid Mode (Recommended):**
+```json
+{
+  "inputPaths": ["lib/"],
+  "mutationEngine": "hybrid"    // AI + rule-based fallback
+}
+```
+
+**Pure LLM Mode:**
+```json
+{
+  "inputPaths": ["lib/"],
+  "mutationEngine": "llm"       // AI-only mutations
+}
+```
+
+**Traditional Mode:**
+```json
+{
+  "inputPaths": ["lib/"],
+  "mutationEngine": "ruleBased" // Fast, reliable
+}
+```
+
+#### Benefits of Ollama Integration
+
+✅ **Privacy**: All processing happens locally  
+✅ **Cost-Free**: No API charges or subscriptions  
+✅ **Offline**: Works without internet  
+✅ **Fast**: Local processing eliminates latency  
+✅ **Simple**: One provider, easy setup  
+✅ **Reliable**: No rate limits or API outages
+```json
+{
+  "mutationEngine": "ruleBased",
+  "mutationTypes": ["arithmetic", "logical", "relational"]
+}
+```
+
+**LLM-Powered** (AI-Generated):
+```json
+{
+  "mutationEngine": "llm",
+  "llmConfig": {
+    "provider": "ollama",
+    "model": "codellama:7b",
+    "baseUrl": "http://localhost:11434",
+    "temperature": 0.7,
+    "maxTokens": 1000
+  }
+}
+```
+
+**Hybrid** (Best of Both):
+```json
+{
+  "mutationEngine": "hybrid",
+  "llmConfig": {
+    "provider": "openai",
+    "model": "gpt-4",
+    "apiKey": "your-api-key"
+  }
+}
+```
+
+#### Supported LLM Providers
+
+- **🏠 Ollama** (Local): `codellama:7b`, `deepseek-coder`, `codegemma`
+- **🧠 OpenAI**: `gpt-4`, `gpt-3.5-turbo`, `gpt-4-turbo`
+- **🤖 Anthropic**: `claude-3-sonnet`, `claude-3-haiku`
+- **🤗 HuggingFace**: `codellama/CodeLlama-7b-hf`, `WizardLM/WizardCoder-15B-V1.0`
+- **🔧 Custom APIs**: Configure any OpenAI-compatible endpoint
 
 ### Configuration Examples
 
@@ -694,6 +812,84 @@ dart bin/smart_mutation.dart --config test_config.json --verbose
     path: output/
 ```
 
+## 🎯 Latest Enhancements (v2.2)
+
+### 📊 Optimized HTML Reports
+
+#### Compact Interactive Tables
+
+- **Space Efficient**: Replaced individual mutation cards with compact table view
+- **Interactive Filtering**: Filter mutations by type, status, and file
+- **Expandable Details**: Click rows to view detailed diff information
+- **Professional Layout**: GitHub-inspired design with improved readability
+- **Performance**: Faster loading and rendering for large mutation sets
+
+### 🎛️ Intelligent File Filtering
+
+#### Source Code Size Limits
+
+- **500-Line Limit**: Automatically rejects source files exceeding 500 lines
+- **Clear Messaging**: Enhanced skip messages with emoji indicators and helpful tips
+- **Smart Detection**: Distinguishes between source files and test files
+- **Performance Boost**: Focuses mutation effort on maintainable code files
+
+**Enhanced Skip Messages:**
+
+```text
+⚠️  Skipping large file: lib/large_file.dart (750 lines)
+    💡 Tip: Consider refactoring files over 500 lines for better maintainability
+    
+✅ Processing: lib/calculate.dart (357 lines)
+```
+
+### 🔧 Configuration Enhancements
+
+**File Size Control:**
+
+```json
+{
+  "maxSourceLines": 500,        // Configure line limit (default: 500)
+  "skipLargeFiles": true,       // Enable/disable size filtering
+  "verboseSkipping": true       // Show detailed skip messages
+}
+```
+
+**Report Optimization:**
+
+```json
+{
+  "reportFormat": "html",
+  "compactMode": true,          // Use compact table layout
+  "enableFiltering": true,      // Enable interactive filtering
+  "expandableDetails": true     // Allow row expansion for details
+}
+```
+
+### 📈 Quality Improvements
+
+- **Memory Optimization**: Reduced memory usage for large mutation sets
+- **Processing Speed**: Faster HTML generation with optimized templates
+- **User Experience**: Improved navigation and visual feedback
+- **Error Handling**: Better error messages and graceful degradation
+
+## 📚 Documentation
+
+### 📖 Complete Guides
+
+- **[Configuration Guide](docs/CONFIG_GUIDE.md)** - Comprehensive configuration options and examples
+- **[Quick Start Guide](docs/QUICK_START.md)** - Get started quickly with minimal setup
+- **[LLM Integration Guide](docs/LLM_GUIDE.md)** - AI-powered mutations with multiple providers
+- **[Ollama Setup Guide](docs/LLM_GUIDE_OLLAMA_ONLY.md)** - Local AI mutations setup
+- **[Simple LLM Examples](docs/SIMPLE_LLM_EXAMPLES.md)** - Basic AI mutation examples
+- **[Changelog](docs/CHANGELOG.md)** - Version history and release notes
+
+### 🔧 Technical Documentation
+
+- **[HTML Report Enhancements](docs/HTML_REPORT_ENHANCEMENTS_V2.2.md)** - v2.2 HTML reporting features
+- **[GitHub Style Reports](docs/GITHUB_STYLE_COMPLETE.md)** - Report styling details
+- **[Optimization Summary](docs/OPTIMIZATION_SUMMARY.md)** - Performance improvements
+- **[Project Organization](docs/PROJECT_ORGANIZATION.md)** - Codebase structure
+
 ## 🤝 Contributing
 
 Contributions are welcome! Here's how to get started:
@@ -734,6 +930,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Smart Mutation Tool v2.1** - Making Dart code more robust through intelligent mutation testing with professional GitHub-style reporting! 🎯
+**Smart Mutation Tool v2.2** - Making Dart code more robust through intelligent mutation testing with professional GitHub-style reporting! 🎯
 
 *Happy Testing!* 🚀

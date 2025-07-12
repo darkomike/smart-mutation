@@ -15,9 +15,10 @@
     "excludePatterns": "Glob patterns for files to exclude. Prevents mutation of test files and generated code.",
     "includePatterns": "Glob patterns for files to include. Usually just ['**/*.dart'] for all Dart files.",
     "lineRanges": "Apply mutations to specific line ranges: {'file_path': {'start': 10, 'end': 50}}. Leave {} for entire files.",
-    "reportFormat": "Report output format. Currently only 'html' supported (GitHub-style reports with diff visualization)."
+    "reportFormat": "Report output format. Currently only 'html' supported (GitHub-style reports with diff visualization).",
+    "mutationEngine": "Mutation engine: 'ruleBased' (traditional), 'llm' (AI-powered), 'hybrid' (LLM with rule-based fallback)",
+    "llmConfig": "LLM configuration for AI-powered mutations. Required when mutationEngine is 'llm' or 'hybrid'."
   },
-
   
   "inputPaths": [
     "lib"
@@ -60,6 +61,62 @@
   
   "reportFormat": "html",
   
+  "mutationEngine": "ruleBased",
+  
+  "_llm_examples": {
+    "_comment": "Uncomment and configure llmConfig section for AI-powered mutations",
+    "_ollama_example": {
+      "mutationEngine": "llm",
+      "llmConfig": {
+        "provider": "ollama",
+        "model": "codellama:7b",
+        "baseUrl": "http://localhost:11434",
+        "temperature": 0.7,
+        "maxTokens": 1000,
+        "timeout": 30,
+        "retryAttempts": 3,
+        "customPrompt": "Create intelligent Dart mutations for {mutation_types}. Focus on semantic bugs and edge cases. Code: {source_code}"
+      }
+    },
+    "_openai_example": {
+      "mutationEngine": "hybrid",
+      "llmConfig": {
+        "provider": "openai",
+        "model": "gpt-4",
+        "apiKey": "your-api-key-here",
+        "temperature": 0.8,
+        "maxTokens": 2000,
+        "timeout": 60,
+        "retryAttempts": 3
+      }
+    },
+    "_anthropic_example": {
+      "mutationEngine": "llm",
+      "llmConfig": {
+        "provider": "anthropic",
+        "model": "claude-3-sonnet-20240229",
+        "apiKey": "your-api-key-here",
+        "temperature": 0.7,
+        "maxTokens": 1500,
+        "timeout": 45,
+        "retryAttempts": 2
+      }
+    },
+    "_huggingface_example": {
+      "mutationEngine": "hybrid",
+      "llmConfig": {
+        "provider": "huggingface",
+        "model": "codellama/CodeLlama-7b-hf",
+        "apiKey": "your-hf-token-here",
+        "baseUrl": "https://api-inference.huggingface.co/models",
+        "temperature": 0.6,
+        "maxTokens": 1000,
+        "timeout": 30,
+        "retryAttempts": 3
+      }
+    }
+  },
+  
   "_usage_examples": {
     "production_mode": {
       "description": "Full testing with coverage analysis",
@@ -84,6 +141,17 @@
         "runTests": false,
         "verbose": true,
         "parallel": false
+      }
+    },
+    "llm_mode": {
+      "description": "AI-powered mutations with local Ollama",
+      "changes": {
+        "mutationEngine": "llm",
+        "llmConfig": {
+          "provider": "ollama",
+          "model": "codellama:7b",
+          "baseUrl": "http://localhost:11434"
+        }
       }
     }
   }
